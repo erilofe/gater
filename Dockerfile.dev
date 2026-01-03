@@ -1,0 +1,17 @@
+FROM golang:alpine
+
+# Install git (often needed for fetching dependencies) and Air for hot reloading
+RUN apk add --no-cache git
+RUN go install github.com/air-verse/air@latest
+
+WORKDIR /app
+
+# Cache dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code (though volume mount will override this in dev)
+COPY . .
+
+# Run Air
+CMD ["air", "-c", ".air.toml"]

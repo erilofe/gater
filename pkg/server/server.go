@@ -23,18 +23,11 @@ func Proxy(target string) gin.HandlerFunc {
 
 		// ... Add circuit breaker or other middleware here
 
-		// Modify the request to direct it to the target URL
+		originalDirector := proxy.Director
 		proxy.Director = func(req *http.Request) {
-			// Copy original request headers
-			req.Header = c.Request.Header
-			req.Header.Add("X-Forwarded-Host", req.Host)
-
-			// Set the request URL to the target URL
+			originalDirector(req)
 			req.Host = remote.Host
-			req.URL.Scheme = remote.Scheme
-			req.URL.Host = remote.Host
-			req.URL.Path = remote.Path
-			req.URL.RawQuery = remote.RawQuery
+			req.Header.Add("X-Forwarded-Host", req.Host)
 		}
 
 		// Serve the request using the reverse proxy

@@ -1,23 +1,60 @@
-# Binaries for programs and plugins
+# Binaries
+# ---------------------
+bin/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
-# Test binary, built with `go test -c`
 *.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Development / Hot Reload (Air)
+# ---------------------
+# Air saves the temporary binary here
+tmp/
 
-# Go workspace file
+# Dependency Directories
+# ---------------------
+vendor/
+
+# Go Workspace
+# ---------------------
 go.work
+go.work.sum
 
-# IDE specific files
+# Environment Variables / Secrets
+# ---------------------
+# Never commit secrets!
+.env
+.env.local
+.env.*.local
+
+# IDEs / Editors
+# ---------------------
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains (GoLand)
 .idea/
-.vscode/
+*.iml
+
+# Vim/Emacs/Others
 *.swp
+*.swo
+*~
+\#*\#
+
+# OS Specific
+# ---------------------
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
