@@ -1,9 +1,10 @@
-package circuit_breaker
+package circuitbreaker
 
 import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/sony/gobreaker"
 	"github.com/stretchr/testify/assert"
@@ -19,15 +20,21 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	return m.Response, m.Err
 }
 
+var defaultSettings = Settings{
+	MaxRequests: 1,
+	Interval:    10 * time.Second,
+	Timeout:     30 * time.Second,
+}
+
 func TestNewCircuitBreaker(t *testing.T) {
-	cb := NewCircuitBreaker("test-cb")
+	cb := NewCircuitBreaker("test-cb", defaultSettings)
 	assert.NotNil(t, cb)
 	assert.Equal(t, "test-cb", cb.Name())
 }
 
 func TestCircuitBreakerTransport_RoundTrip_Success(t *testing.T) {
 	// Setup
-	cb := NewCircuitBreaker("cb-success")
+	cb := NewCircuitBreaker("cb-success", defaultSettings)
 	mockRT := &MockRoundTripper{
 		Response: &http.Response{
 			StatusCode: http.StatusOK,
@@ -51,7 +58,7 @@ func TestCircuitBreakerTransport_RoundTrip_Success(t *testing.T) {
 
 func TestCircuitBreakerTransport_RoundTrip_5xxError(t *testing.T) {
 	// Setup
-	cb := NewCircuitBreaker("cb-500")
+	cb := NewCircuitBreaker("cb-500", defaultSettings)
 	mockRT := &MockRoundTripper{
 		Response: &http.Response{
 			StatusCode: http.StatusInternalServerError,
@@ -77,7 +84,7 @@ func TestCircuitBreakerTransport_RoundTrip_5xxError(t *testing.T) {
 
 func TestCircuitBreakerTransport_RoundTrip_NetworkError(t *testing.T) {
 	// Setup
-	cb := NewCircuitBreaker("cb-net-err")
+	cb := NewCircuitBreaker("cb-net-err", defaultSettings)
 	expectedErr := errors.New("network error")
 	mockRT := &MockRoundTripper{
 		Response: nil,
@@ -99,7 +106,7 @@ func TestCircuitBreakerTransport_RoundTrip_NetworkError(t *testing.T) {
 
 func TestCircuitBreaker_TripsOpen(t *testing.T) {
 	// Setup
-	cb := NewCircuitBreaker("cb-tripping")
+	cb := NewCircuitBreaker("cb-tripping", defaultSettings)
 	// Returns 500 to trigger failures
 	mockRT := &MockRoundTripper{
 		Response: &http.Response{

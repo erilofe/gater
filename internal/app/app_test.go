@@ -5,8 +5,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pietroagazzi/gater/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,9 +45,20 @@ func TestSetupRouter_Unit(t *testing.T) {
 	}))
 	defer mockPostSrv.Close()
 
+	// Setup Config
+	cfg := &config.Config{
+		UserServiceURL: mockUserSrv.URL,
+		PostServiceURL: mockPostSrv.URL,
+		CircuitBreaker: config.CircuitBreakerConfig{
+			MaxRequests: 1,
+			Interval:    10 * time.Second,
+			Timeout:     30 * time.Second,
+		},
+	}
+
 	// Setup Router
 	gin.SetMode(gin.TestMode)
-	router := SetupRouter(mockUserSrv.URL, mockPostSrv.URL)
+	router := SetupRouter(cfg)
 
 	// Test /users/ route
 	w := NewCloseNotifyingRecorder()
@@ -72,8 +85,18 @@ func TestSetupRouter_Integration(t *testing.T) {
 		t.Skip("Skipping integration test: USER_SERVICE_URL or POST_SERVICE_URL not set")
 	}
 
+	cfg := &config.Config{
+		UserServiceURL: userURL,
+		PostServiceURL: postURL,
+		CircuitBreaker: config.CircuitBreakerConfig{
+			MaxRequests: 1,
+			Interval:    10 * time.Second,
+			Timeout:     30 * time.Second,
+		},
+	}
+
 	gin.SetMode(gin.TestMode)
-	router := SetupRouter(userURL, postURL)
+	router := SetupRouter(cfg)
 
 	// Test User Service (Expects the http-echo response)
 	w := NewCloseNotifyingRecorder()

@@ -2,20 +2,28 @@ package app
 
 import (
 	"log"
-	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pietroagazzi/gater/pkg/server"
+	"github.com/pietroagazzi/gater/internal/circuitbreaker"
+	"github.com/pietroagazzi/gater/internal/config"
+	"github.com/pietroagazzi/gater/internal/proxy"
 )
 
 // SetupRouter configures the Gin engine with the necessary routes and middlewares.
-func SetupRouter(userServiceURL, postServiceURL string) *gin.Engine {
+func SetupRouter(cfg *config.Config) *gin.Engine {
 	router := gin.Default()
+
+	// Helper to convert internal config to circuitbreaker settings
+	cbSettings := circuitbreaker.Settings{
+		MaxRequests: cfg.CircuitBreaker.MaxRequests,
+		Interval:    cfg.CircuitBreaker.Interval,
+		Timeout:     cfg.CircuitBreaker.Timeout,
+	}
 
 	// Set up a catch-all route to handle all incoming requests
 	// and forward them to the Proxy function
-	router.Any("/users/*path", server.Proxy(userServiceURL, "UserServiceCircuitBreaker"))
-	router.Any("/posts/*path", server.Proxy(postServiceURL, "PostServiceCircuitBreaker"))
+	router.Any("/users/*path", proxy.Proxy(cfg.UserServiceURL, "UserServiceCircuitBreaker", cbSettings))
+	router.Any("/posts/*path", proxy.Proxy(cfg.PostServiceURL, "PostServiceCircuitBreaker", cbSettings))
 
 	return router
 }
@@ -24,18 +32,10 @@ func SetupRouter(userServiceURL, postServiceURL string) *gin.Engine {
 func Run() {
 	log.Println("Running Gater...")
 
-	userServiceURL := os.Getenv("USER_SERVICE_URL")
-	if userServiceURL == "" {
-		userServiceURL = "http://localhost:8081"
-	}
+	cfg := config.LoadConfig()
 
-	postServiceURL := os.Getenv("POST_SERVICE_URL")
-	if postServiceURL == "" {
-		postServiceURL = "http://localhost:8082"
-	}
+	router := SetupRouter(cfg)
 
-	router := SetupRouter(userServiceURL, postServiceURL)
-
-	// Start the server on port 8080
-	router.Run(":8080")
+	// Start the server on the configured port
+	router.Run(":" + cfg.Port)
 }

@@ -1,4 +1,4 @@
-package server
+package proxy
 
 import (
 	"log"
@@ -7,12 +7,12 @@ import (
 	"net/url"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pietroagazzi/gater/pkg/circuit_breaker"
+	"github.com/pietroagazzi/gater/internal/circuitbreaker"
 	"github.com/sony/gobreaker"
 )
 
 // Proxy forwards incoming requests to the target URL specified in the request URI.
-func Proxy(target string, cbName string) gin.HandlerFunc {
+func Proxy(target string, cbName string, cbSettings circuitbreaker.Settings) gin.HandlerFunc {
 	remote, err := url.Parse(target)
 
 	if err != nil {
@@ -24,9 +24,9 @@ func Proxy(target string, cbName string) gin.HandlerFunc {
 	// Create the reverse proxy once
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 
-	cb := circuit_breaker.NewCircuitBreaker(cbName)
+	cb := circuitbreaker.NewCircuitBreaker(cbName, cbSettings)
 
-	proxy.Transport = circuit_breaker.NewCircuitBreakerTransport(cb, http.DefaultTransport)
+	proxy.Transport = circuitbreaker.NewCircuitBreakerTransport(cb, http.DefaultTransport)
 
 	proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
 		if err == gobreaker.ErrOpenState {

@@ -1,11 +1,13 @@
-package server
+package proxy
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pietroagazzi/gater/internal/circuitbreaker"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,8 +27,14 @@ func (c *CloseNotifyingRecorder) CloseNotify() <-chan bool {
 	return c.closed
 }
 
+var defaultSettings = circuitbreaker.Settings{
+	MaxRequests: 1,
+	Interval:    10 * time.Second,
+	Timeout:     30 * time.Second,
+}
+
 func TestProxy(t *testing.T) {
-	// Setup a Mock Target Server
+	// 1. Setup a Mock Target Server
 	// This server represents the "User Service" or "Post Service"
 	mockResponse := `{"message": "success"}`
 	targetServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -41,45 +49,45 @@ func TestProxy(t *testing.T) {
 	}))
 	defer targetServer.Close()
 
-	// Setup Gin Router with the Proxy
+	// 2. Setup Gin Router with the Proxy
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Any("/*path", Proxy(targetServer.URL, "test-cb"))
+	router.Any("/*path", Proxy(targetServer.URL, "test-cb", defaultSettings))
 
-	// Create a Request to the Proxy
+	// 3. Create a Request to the Proxy
 	w := NewCloseNotifyingRecorder()
 	req, _ := http.NewRequest("GET", "/some/path", nil)
 
-	// Perform the Request
+	// 4. Perform the Request
 	router.ServeHTTP(w, req)
 
-	// Assertions
+	// 5. Assertions
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.JSONEq(t, mockResponse, w.Body.String())
 }
 
 func TestProxy_CircuitBreaker_Integration(t *testing.T) {
-	// Setup a Mock Target Server that always fails
+	// 1. Setup a Mock Target Server that always fails
 	targetServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer targetServer.Close()
 
-	// Setup Gin Router
+	// 2. Setup Gin Router
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Any("/*path", Proxy(targetServer.URL, "test-cb-integration"))
+	router.Any("/*path", Proxy(targetServer.URL, "test-cb-integration", defaultSettings))
 
-	// First Request: Should fail with 502 (Bad Gateway) because the server returns 500
+	// 3. First Request: Should fail with 502 (Bad Gateway) because the server returns 500
 	// This failure triggers the Circuit Breaker to open because failure ratio 1/1 = 100% > 60%
 	w1 := NewCloseNotifyingRecorder()
 	req1, _ := http.NewRequest("GET", "/fail", nil)
 	router.ServeHTTP(w1, req1)
-
+	
 	// Note: 502 is returned by our proxy ErrorHandler when not OpenState
 	assert.Equal(t, http.StatusBadGateway, w1.Code)
 
-	// Second Request: Should fail with 503 (Service Unavailable) immediately
+	// 4. Second Request: Should fail with 503 (Service Unavailable) immediately
 	// because the Circuit Breaker is now OPEN.
 	w2 := NewCloseNotifyingRecorder()
 	req2, _ := http.NewRequest("GET", "/fail", nil)
@@ -90,18 +98,18 @@ func TestProxy_CircuitBreaker_Integration(t *testing.T) {
 }
 
 func TestProxy_CircuitBreaker_ServiceUnreachable(t *testing.T) {
-	// Setup a Mock Target Server and immediately close it to simulate "Service Down"
+	// 1. Setup a Mock Target Server and immediately close it to simulate "Service Down"
 	// We get a valid URL, but nothing will be listening on it.
 	targetServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	targetURL := targetServer.URL
 	targetServer.Close() // Simulate service down (Connection Refused)
 
-	// Setup Gin Router
+	// 2. Setup Gin Router
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Any("/*path", Proxy(targetURL, "test-cb-unreachable"))
+	router.Any("/*path", Proxy(targetURL, "test-cb-unreachable", defaultSettings))
 
-	// First Request: Should fail with 502 (Bad Gateway)
+	// 3. First Request: Should fail with 502 (Bad Gateway)
 	// The underlying transport returns an error (dial tcp ...: connect: connection refused)
 	// The Circuit Breaker counts this as a failure.
 	w1 := NewCloseNotifyingRecorder()
@@ -111,7 +119,7 @@ func TestProxy_CircuitBreaker_ServiceUnreachable(t *testing.T) {
 	assert.Equal(t, http.StatusBadGateway, w1.Code)
 	assert.Contains(t, w1.Body.String(), "Bad gateway")
 
-	// Second Request: Should fail with 503 (Service Unavailable)
+	// 4. Second Request: Should fail with 503 (Service Unavailable)
 	// Because failure ratio > 60% (1/1 failures), the Circuit Breaker trips to OPEN.
 	w2 := NewCloseNotifyingRecorder()
 	req2, _ := http.NewRequest("GET", "/fail", nil)
