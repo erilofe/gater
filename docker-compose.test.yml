@@ -1,0 +1,26 @@
+services:
+  user:
+    image: hashicorp/http-echo
+    command: -text='{"service":"user", "status":"ok"}' -listen=:8081
+    ports:
+      - "8081:8081"
+
+  post:
+    image: hashicorp/http-echo
+    command: -text='{"service":"post", "status":"ok"}' -listen=:8082
+    ports:
+      - "8082:8082"
+
+  tester:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    working_dir: /app
+    environment:
+      - USER_SERVICE_URL=http://user:8081
+      - POST_SERVICE_URL=http://post:8082
+      - GIN_MODE=release
+    depends_on:
+      - user
+      - post
+    command: ["go", "test", "-v", "./..."]

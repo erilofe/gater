@@ -8,6 +8,18 @@ import (
 	"github.com/pietroagazzi/gater/pkg/server"
 )
 
+// SetupRouter configures the Gin engine with the necessary routes and middlewares.
+func SetupRouter(userServiceURL, postServiceURL string) *gin.Engine {
+	router := gin.Default()
+
+	// Set up a catch-all route to handle all incoming requests
+	// and forward them to the Proxy function
+	router.Any("/users/*path", server.Proxy(userServiceURL))
+	router.Any("/posts/*path", server.Proxy(postServiceURL))
+
+	return router
+}
+
 // Run initializes and starts the Gater application.
 func Run() {
 	log.Println("Running Gater...")
@@ -22,12 +34,7 @@ func Run() {
 		postServiceURL = "http://localhost:8082"
 	}
 
-	router := gin.Default()
-
-	// Set up a catch-all route to handle all incoming requests
-	// and forward them to the Proxy function
-	router.Any("/users/*path", server.Proxy(userServiceURL))
-	router.Any("/posts/*path", server.Proxy(postServiceURL))
+	router := SetupRouter(userServiceURL, postServiceURL)
 
 	// Start the server on port 8080
 	router.Run(":8080")
