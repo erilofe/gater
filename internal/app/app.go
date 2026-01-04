@@ -14,8 +14,8 @@ func SetupRouter(userServiceURL, postServiceURL string) *gin.Engine {
 
 	// Set up a catch-all route to handle all incoming requests
 	// and forward them to the Proxy function
-	router.Any("/users/*path", server.Proxy(userServiceURL))
-	router.Any("/posts/*path", server.Proxy(postServiceURL))
+	router.Any("/users/*path", server.Proxy(userServiceURL, "UserServiceCircuitBreaker"))
+	router.Any("/posts/*path", server.Proxy(postServiceURL, "PostServiceCircuitBreaker"))
 
 	return router
 }

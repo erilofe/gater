@@ -75,5 +75,6 @@ go test ./...
 To run the full suite, including integration tests that require dependent services:
 
 ```bash
-docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+docker compose -f docker-compose.test.yml -p gater-test up --build --abort-on-container-exit && \
+docker compose -f docker-compose.test.yml -p gater-test down
 ```

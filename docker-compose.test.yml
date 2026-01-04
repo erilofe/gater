@@ -2,14 +2,14 @@ services:
   user:
     image: hashicorp/http-echo
     command: -text='{"service":"user", "status":"ok"}' -listen=:8081
-    ports:
-      - "8081:8081"
+    networks:
+      - internal
 
   post:
     image: hashicorp/http-echo
     command: -text='{"service":"post", "status":"ok"}' -listen=:8082
-    ports:
-      - "8082:8082"
+    networks:
+      - internal
 
   tester:
     build:
@@ -23,4 +23,9 @@ services:
     depends_on:
       - user
       - post
+    networks:
+      - internal
     command: ["go", "test", "-v", "./..."]
+
+networks:
+  internal:
