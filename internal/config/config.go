@@ -18,11 +18,17 @@ type CircuitBreakerConfig struct {
 
 // Config holds the application configuration.
 type Config struct {
+	// DEPRECATED: Use service discovery instead
 	UserServiceURL string
+	// DEPRECATED: Use service discovery instead
 	PostServiceURL string
 	Port           string
 	ConsulAddress  string
 	CircuitBreaker CircuitBreakerConfig
+
+	// Service Discovery
+	DiscoveryProvider string // "consul", "static", "kubernetes", "etcd"
+	DiscoveryRoutes   string // JSON array for static provider (future use)
 }
 
 // LoadConfig loads the configuration from environment variables.
@@ -33,7 +39,7 @@ func LoadConfig() *Config {
 
 	return &Config{
 		// Default to empty string to indicate "use discovery" if not provided
-		UserServiceURL: getEnv("USER_SERVICE_URL", ""), 
+		UserServiceURL: getEnv("USER_SERVICE_URL", ""),
 		PostServiceURL: getEnv("POST_SERVICE_URL", ""),
 		Port:           getEnv("PORT", "8080"),
 		ConsulAddress:  getEnv("CONSUL_ADDRESS", "localhost:8500"),
@@ -42,6 +48,10 @@ func LoadConfig() *Config {
 			Interval:    getEnvAsDuration("CB_INTERVAL", 10*time.Second),
 			Timeout:     getEnvAsDuration("CB_TIMEOUT", 30*time.Second),
 		},
+
+		// Service Discovery
+		DiscoveryProvider: getEnv("DISCOVERY_PROVIDER", ""),
+		DiscoveryRoutes:   getEnv("DISCOVERY_ROUTES", ""),
 	}
 }
 

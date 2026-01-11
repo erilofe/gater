@@ -1,7 +1,9 @@
 package app
 
 import (
+	"context"
 	"log"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pietroagazzi/gater/internal/circuitbreaker"
@@ -47,23 +49,30 @@ func Run() {
 
 	cfg := config.LoadConfig()
 
-	// Initialize Consul Discovery
-	discoveryClient, err := discovery.NewClient(cfg.ConsulAddress)
+	// Initialize Service Discovery Provider
+	provider, err := discovery.NewProvider(cfg)
 	if err != nil {
-		log.Fatalf("Failed to initialize Consul client: %v", err)
+		log.Fatalf("Failed to initialize discovery provider: %v", err)
+	}
+	defer provider.Close()
+
+	log.Printf("Using service discovery provider: %s", provider.Name())
+
+	// Discover Routes with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	log.Println("Discovering services...")
+	routes, err := provider.DiscoverRoutes(ctx)
+	if err != nil {
+		log.Fatalf("Failed to discover routes from %s: %v", provider.Name(), err)
 	}
 
-	// Dynamic Discovery
-	log.Println("Scanning Consul for services with 'gater.prefix' tag...")
-	routes, err := discoveryClient.DiscoverRoutes()
-	if err != nil {
-		log.Fatalf("Failed to discover routes: %v", err)
-	}
+	log.Printf("Discovered %d routes", len(routes))
 
 	if len(routes) == 0 {
-		log.Println("Warning: No routes discovered from Consul.")
-		// We might want to fallback to static config if desired, but
-		// the goal is dynamic discovery.
+		log.Printf("Warning: No routes discovered from %s provider.", provider.Name())
+		// The application will continue but won't proxy any requests
 	}
 
 	router := SetupRouter(cfg, routes)
