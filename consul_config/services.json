@@ -1,0 +1,34 @@
+{
+    "services": [
+        {
+            "name": "user-service",
+            "id": "user-service-1",
+            "address": "user",
+            "port": 8081,
+            "tags": ["gater.prefix=/users"],
+            "checks": [
+                {
+                    "name": "User Service TCP Check",
+                    "tcp": "user:8081",
+                    "interval": "10s",
+                    "timeout": "1s"
+                }
+            ]
+        },
+        {
+            "name": "post-service",
+            "id": "post-service-1",
+            "address": "post",
+            "port": 8082,
+            "tags": ["gater.prefix=/posts"],
+            "checks": [
+                {
+                    "name": "Post Service TCP Check",
+                    "tcp": "post:8082",
+                    "interval": "10s",
+                    "timeout": "1s"
+                }
+            ]
+        }
+    ]
+}

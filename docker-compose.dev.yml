@@ -1,26 +1,50 @@
 services:
-  user:
-    image: hashicorp/http-echo
-    command: -text='{"service":"user", "status":"ok"}' -listen=:8081
-    ports:
-      - "8081:8081"
+    user:
+        image: hashicorp/http-echo
+        command: -text='{"service":"user", "status":"ok"}' -listen=:8081
+        ports:
+            - "8081:8081"
 
-  post:
-    image: hashicorp/http-echo
-    command: -text='{"service":"post", "status":"ok"}' -listen=:8082
-    ports:
-      - "8082:8082"
+    post:
+        image: hashicorp/http-echo
+        command: -text='{"service":"post", "status":"ok"}' -listen=:8082
+        ports:
+            - "8082:8082"
 
-  gater:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    depends_on:
-      - user
-      - post
-    ports:
-      - "8080:8080"
-    env_file:
-      - .env
-    volumes:
-      - .:/app
+    gater:
+        build:
+            context: .
+            dockerfile: Dockerfile.dev
+        depends_on:
+            - user
+            - post
+        ports:
+            - "8080:8080"
+        env_file:
+            - .env
+        environment:
+            - CONSUL_ADDRESS=consul:8500
+        volumes:
+            - .:/app
+    consul:
+        image: hashicorp/consul:latest
+        container_name: consul
+        restart: always
+        volumes:
+            - ./consul_data:/consul/data
+            - ./consul_config:/consul/config
+        ports:
+            - "8500:8500" # UI
+            - "8600:8600/udp" # DNS (UDP)
+            - "8600:8600/tcp" # DNS (TCP)
+            - "8300:8300" # Server RPC
+            - "8301:8301" # Serf LAN
+            - "8301:8301/udp"
+            - "8302:8302"
+            - "8302:8302/udp"
+        command: agent -server -bootstrap -ui -client=0.0.0.0 -data-dir=/consul/data -config-dir=/consul/config
+        environment:
+            - CONSUL_LOCAL_CONFIG={"acl":{"enabled":false, "default_policy":"allow", "down_policy":"extend-cache"}}
+            - CONSUL_RETRY_JOIN_ADDRESS=178.18.63.42
+            - CONSUL_GOSSIP_ENCRYPTION=enable
+            - CONSUL_GOSSIP_ENCRYPTION_KEY=Mmqfj/p23iDGvBi1U6gE+WCr+dT+Fzm8+S2HcoVTB6c=

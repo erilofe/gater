@@ -1,0 +1,1 @@
+{"acl":{"enabled":false, "default_policy":"allow", "down_policy":"extend-cache"}}

@@ -48,7 +48,12 @@ go.work.sum
 *.swp
 *.swo
 *~
-\#*\#
+
+\#*#
+
+# Consul Generated Artifacts
+# ---------------------
+consul_data/
 
 # OS Specific
 # ---------------------

@@ -26,31 +26,42 @@ go run cmd/gater/main.go
 To start the application in a production-like environment (optimized build, no file watching):
 
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
 
-The application will be available at `http://localhost:8080`.
+The gateway will be available at `http://localhost:8080` and the Consul UI at `http://localhost:8500`. Persistent data lives in `consul_data/`; delete its contents between runs if you need a clean cluster snapshot.
 
 ### Development (Hot Reloading)
 
 To start the application with **Air** for live reloading:
 
-```bash
-docker compose -f docker-compose.dev.yml up --build
-```
+- Start the dev stack (foreground build + hot reload):
+    ```bash
+    docker compose -f docker-compose.dev.yml up --build
+    ```
+- Edit files under `cmd/` or `internal/`; Air rebuilds and reloads automatically.
 
-When running in development mode:
-
-1. Keep the logs open (`docker compose -f docker-compose.dev.yml logs -f gater`).
-2. Make changes to the code.
-3. Air will automatically rebuild and restart the application.
+The development compose file mounts `consul_config/` and `consul_data/`, so updates to `consul_config/services.json` are picked up automatically after a Consul restart.
 
 ### Verifying Connection
 
 You can verify the connection to the mock services:
 
 - **User Service**: `curl http://localhost:8080/users/test` -> Should return `{"service":"user", "status":"ok"}`
+
 - **Post Service**: `curl http://localhost:8080/posts/test` -> Should return `{"service":"post", "status":"ok"}`
+
+To inspect the Consul catalog directly:
+
+```bash
+docker compose -f docker-compose.dev.yml exec consul consul catalog services
+```
+
+If you change `consul_config/services.json`, reload the service definitions with:
+
+```bash
+docker compose -f docker-compose.dev.yml restart consul
+```
 
 ## How to Build
 
@@ -78,3 +89,28 @@ To run the full suite, including integration tests that require dependent servic
 docker compose -f docker-compose.test.yml -p gater-test up --build --abort-on-container-exit && \
 docker compose -f docker-compose.test.yml -p gater-test down
 ```
+
+**Consul (ACL bootstrap & access)**
+
+1. Generate a management token inside the running agent:
+   ```bash
+   docker compose -f docker-compose.dev.yml exec -it consul consul acl bootstrap
+   ```
+2. Copy the `SecretID` from the output and store it securely.
+3. Authenticate with the token:
+   - **CLI**: `docker compose -f docker-compose.dev.yml exec consul consul login -token <SecretID>`
+   - **UI**: open `http://localhost:8500`, click **Log In**, and paste the `SecretID`.
+
+Example bootstrap output:
+
+```
+AccessorID:       ceb60d9b-795c-0248-708b-9a7d9382d58f
+SecretID:         a0360496-9669-b859-5563-3015259d6da7
+Description:      Bootstrap Token (Global Management)
+Local:            false
+Create Time:      2026-01-04 19:18:15.825222154 +0000 UTC
+Policies:
+   00000000-0000-0000-0000-000000000001 - global-management
+```
+
+Treat the `SecretID` as sensitive; rotate it if it is ever exposed.

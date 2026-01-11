@@ -21,6 +21,7 @@ type Config struct {
 	UserServiceURL string
 	PostServiceURL string
 	Port           string
+	ConsulAddress  string
 	CircuitBreaker CircuitBreakerConfig
 }
 
@@ -31,9 +32,11 @@ func LoadConfig() *Config {
 	_ = godotenv.Load()
 
 	return &Config{
-		UserServiceURL: getEnv("USER_SERVICE_URL", "http://localhost:8081"),
-		PostServiceURL: getEnv("POST_SERVICE_URL", "http://localhost:8082"),
+		// Default to empty string to indicate "use discovery" if not provided
+		UserServiceURL: getEnv("USER_SERVICE_URL", ""), 
+		PostServiceURL: getEnv("POST_SERVICE_URL", ""),
 		Port:           getEnv("PORT", "8080"),
+		ConsulAddress:  getEnv("CONSUL_ADDRESS", "localhost:8500"),
 		CircuitBreaker: CircuitBreakerConfig{
 			MaxRequests: getEnvAsUint32("CB_MAX_REQUESTS", 1),
 			Interval:    getEnvAsDuration("CB_INTERVAL", 10*time.Second),

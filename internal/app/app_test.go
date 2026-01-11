@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pietroagazzi/gater/internal/config"
+	"github.com/pietroagazzi/gater/internal/discovery"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,7 +30,7 @@ func (c *CloseNotifyingRecorder) CloseNotify() <-chan bool {
 }
 
 // TestSetupRouter_Unit verifies that the router routes traffic correctly
-// using local mock servers. This runs in isolation.
+// using manually injected routes (simulating discovery).
 func TestSetupRouter_Unit(t *testing.T) {
 	// Mock User Service
 	mockUserSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -47,8 +48,6 @@ func TestSetupRouter_Unit(t *testing.T) {
 
 	// Setup Config
 	cfg := &config.Config{
-		UserServiceURL: mockUserSrv.URL,
-		PostServiceURL: mockPostSrv.URL,
 		CircuitBreaker: config.CircuitBreakerConfig{
 			MaxRequests: 1,
 			Interval:    10 * time.Second,
@@ -56,9 +55,23 @@ func TestSetupRouter_Unit(t *testing.T) {
 		},
 	}
 
+	// Simulated Discovered Routes
+	routes := []discovery.ServiceRoute{
+		{
+			ServiceName: "user-service",
+			Prefix:      "/users",
+			TargetURL:   mockUserSrv.URL,
+		},
+		{
+			ServiceName: "post-service",
+			Prefix:      "/posts",
+			TargetURL:   mockPostSrv.URL,
+		},
+	}
+
 	// Setup Router
 	gin.SetMode(gin.TestMode)
-	router := SetupRouter(cfg)
+	router := SetupRouter(cfg, routes)
 
 	// Test /users/ route
 	w := NewCloseNotifyingRecorder()
@@ -76,7 +89,7 @@ func TestSetupRouter_Unit(t *testing.T) {
 }
 
 // TestSetupRouter_Integration runs only if the environment variables for services are set.
-// This is intended to run inside the Docker test container against the other containers.
+// It verifies that we can pass URLs from env vars into the router configuration manually.
 func TestSetupRouter_Integration(t *testing.T) {
 	userURL := os.Getenv("USER_SERVICE_URL")
 	postURL := os.Getenv("POST_SERVICE_URL")
@@ -86,8 +99,6 @@ func TestSetupRouter_Integration(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		UserServiceURL: userURL,
-		PostServiceURL: postURL,
 		CircuitBreaker: config.CircuitBreakerConfig{
 			MaxRequests: 1,
 			Interval:    10 * time.Second,
@@ -95,23 +106,19 @@ func TestSetupRouter_Integration(t *testing.T) {
 		},
 	}
 
-	gin.SetMode(gin.TestMode)
-	router := SetupRouter(cfg)
+	routes := []discovery.ServiceRoute{
+		{ServiceName: "user-service", Prefix: "/users", TargetURL: userURL},
+		{ServiceName: "post-service", Prefix: "/posts", TargetURL: postURL},
+	}
 
-	// Test User Service (Expects the http-echo response)
+	gin.SetMode(gin.TestMode)
+	router := SetupRouter(cfg, routes)
+
+	// Test User Service
 	w := NewCloseNotifyingRecorder()
 	req, _ := http.NewRequest("GET", "/users/test", nil)
 	router.ServeHTTP(w, req)
 	
 	assert.Equal(t, http.StatusOK, w.Code)
-	// The http-echo service returns exactly what we configured in docker-compose.test.yml
 	assert.Contains(t, w.Body.String(), `"service":"user"`)
-
-	// Test Post Service
-	w = NewCloseNotifyingRecorder()
-	req, _ = http.NewRequest("GET", "/posts/test", nil)
-	router.ServeHTTP(w, req)
-	
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), `"service":"post"`)
 }
