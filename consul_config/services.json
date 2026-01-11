@@ -5,7 +5,6 @@
             "id": "user-service-1",
             "address": "user",
             "port": 8081,
-            "tags": ["gater.prefix=/users"],
             "checks": [
                 {
                     "name": "User Service TCP Check",
@@ -20,7 +19,6 @@
             "id": "post-service-1",
             "address": "post",
             "port": 8082,
-            "tags": ["gater.prefix=/posts"],
             "checks": [
                 {
                     "name": "Post Service TCP Check",

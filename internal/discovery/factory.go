@@ -26,14 +26,6 @@ func NewProvider(cfg *config.Config) (Provider, error) {
 		}
 		return NewConsulProvider(cfg.ConsulAddress)
 
-	// Future cases:
-	// case ProviderTypeStatic:
-	//     return static.NewStaticProvider(cfg.DiscoveryRoutes)
-	// case ProviderTypeKubernetes:
-	//     return kubernetes.NewKubernetesProvider(cfg.KubernetesNamespace)
-	// case ProviderTypeEtcd:
-	//     return etcd.NewEtcdProvider(cfg.EtcdEndpoints, cfg.EtcdPrefix)
-
 	default:
 		return nil, fmt.Errorf("unknown provider type: %s", providerType)
 	}
@@ -54,14 +46,6 @@ func determineProviderType(cfg *config.Config) ProviderType {
 		return ProviderTypeConsul
 	}
 
-	// Future: Add auto-detection for other providers
-	// if cfg.DiscoveryRoutes != "" {
-	//     return ProviderTypeStatic
-	// }
-	// if cfg.KubernetesNamespace != "" {
-	//     return ProviderTypeKubernetes
-	// }
-
-	// Default fallback (for now, requires Consul)
+	// Default fallback
 	return ProviderTypeConsul
 }

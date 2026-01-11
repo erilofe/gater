@@ -58,22 +58,45 @@ func Run() {
 
 	log.Printf("Using service discovery provider: %s", provider.Name())
 
-	// Discover Routes with timeout
+	// Load Routes from YAML
+	log.Printf("Loading routes from: %s", cfg.RoutesConfigPath)
+	routeConfigs, err := config.LoadRoutesFromFile(cfg.RoutesConfigPath)
+	if err != nil {
+		log.Fatalf("Failed to load routes config: %v", err)
+	}
+
+	log.Printf("Loaded %d routes from config", len(routeConfigs))
+
+	// Resolve each service using discovery provider
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	log.Println("Discovering services...")
-	routes, err := provider.DiscoverRoutes(ctx)
-	if err != nil {
-		log.Fatalf("Failed to discover routes from %s: %v", provider.Name(), err)
-	}
+	var routes []discovery.ServiceRoute
 
-	log.Printf("Discovered %d routes", len(routes))
+	for _, routeCfg := range routeConfigs {
+		log.Printf("Resolving service: %s for path: %s", routeCfg.ServiceName, routeCfg.Path)
+
+		targetURL, err := provider.ResolveService(ctx, routeCfg.ServiceName)
+		if err != nil {
+			log.Printf("ERROR: Failed to resolve service %s: %v", routeCfg.ServiceName, err)
+			// Skip route and continue
+			continue
+		}
+
+		routes = append(routes, discovery.ServiceRoute{
+			ServiceName: routeCfg.ServiceName,
+			Prefix:      routeCfg.Path,
+			TargetURL:   targetURL,
+		})
+
+		log.Printf("Resolved %s to %s", routeCfg.ServiceName, targetURL)
+	}
 
 	if len(routes) == 0 {
-		log.Printf("Warning: No routes discovered from %s provider.", provider.Name())
-		// The application will continue but won't proxy any requests
+		log.Fatalf("No routes configured or all services failed resolution")
 	}
+
+	log.Printf("Successfully resolved %d routes", len(routes))
 
 	router := SetupRouter(cfg, routes)
 

@@ -1,12 +1,14 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
+	"gopkg.in/yaml.v3"
 )
 
 // CircuitBreakerConfig holds the settings for the circuit breakers.
@@ -18,17 +20,27 @@ type CircuitBreakerConfig struct {
 
 // Config holds the application configuration.
 type Config struct {
-	// DEPRECATED: Use service discovery instead
-	UserServiceURL string
-	// DEPRECATED: Use service discovery instead
-	PostServiceURL string
 	Port           string
 	ConsulAddress  string
 	CircuitBreaker CircuitBreakerConfig
 
 	// Service Discovery
-	DiscoveryProvider string // "consul", "static", "kubernetes", "etcd"
-	DiscoveryRoutes   string // JSON array for static provider (future use)
+	DiscoveryProvider string
+
+	// Routing
+	RoutesConfigPath string // Path to routes.yml file
+}
+
+// RouteConfig holds the configuration for a single route.
+type RouteConfig struct {
+	Path           string   `yaml:"path"`
+	ServiceName    string   `yaml:"service_name"`
+	Methods        []string `yaml:"methods"`
+	CircuitBreaker CircuitBreakerConfig
+
+	// For future purpose
+	// LoadBalancer string `yaml:"load_balancer"`
+	// Middleware   []string `yaml:"middleware"`
 }
 
 // LoadConfig loads the configuration from environment variables.
@@ -38,11 +50,8 @@ func LoadConfig() *Config {
 	_ = godotenv.Load()
 
 	return &Config{
-		// Default to empty string to indicate "use discovery" if not provided
-		UserServiceURL: getEnv("USER_SERVICE_URL", ""),
-		PostServiceURL: getEnv("POST_SERVICE_URL", ""),
-		Port:           getEnv("PORT", "8080"),
-		ConsulAddress:  getEnv("CONSUL_ADDRESS", "localhost:8500"),
+		Port:          getEnv("PORT", "8080"),
+		ConsulAddress: getEnv("CONSUL_ADDRESS", "localhost:8500"),
 		CircuitBreaker: CircuitBreakerConfig{
 			MaxRequests: getEnvAsUint32("CB_MAX_REQUESTS", 1),
 			Interval:    getEnvAsDuration("CB_INTERVAL", 10*time.Second),
@@ -51,7 +60,9 @@ func LoadConfig() *Config {
 
 		// Service Discovery
 		DiscoveryProvider: getEnv("DISCOVERY_PROVIDER", ""),
-		DiscoveryRoutes:   getEnv("DISCOVERY_ROUTES", ""),
+
+		// Routing
+		RoutesConfigPath: getEnv("ROUTES_CONFIG", "config/routes.yml"),
 	}
 }
 
@@ -89,4 +100,29 @@ func getEnvAsDuration(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return value
+}
+
+// LoadRoutesFromFile loads route configuration from a YAML file.
+func LoadRoutesFromFile(filepath string) ([]RouteConfig, error) {
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read routes file: %w", err)
+	}
+
+	var config struct {
+		Routes []RouteConfig `yaml:"routes"`
+	}
+
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse routes YAML: %w", err)
+	}
+
+	// Validation
+	for i, route := range config.Routes {
+		if route.Path == "" || route.ServiceName == "" {
+			return nil, fmt.Errorf("route %d: path and service_name are required", i)
+		}
+	}
+
+	return config.Routes, nil
 }
