@@ -52,7 +52,7 @@ func TestProxy(t *testing.T) {
 	// 2. Setup Gin Router with the Proxy
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Any("/*path", Proxy(targetServer.URL, "test-cb", defaultSettings))
+	router.Any("/*path", Proxy([]string{targetServer.URL}, "test-cb", defaultSettings))
 
 	// 3. Create a Request to the Proxy
 	w := NewCloseNotifyingRecorder()
@@ -76,14 +76,14 @@ func TestProxy_CircuitBreaker_Integration(t *testing.T) {
 	// 2. Setup Gin Router
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Any("/*path", Proxy(targetServer.URL, "test-cb-integration", defaultSettings))
+	router.Any("/*path", Proxy([]string{targetServer.URL}, "test-cb-integration", defaultSettings))
 
 	// 3. First Request: Should fail with 502 (Bad Gateway) because the server returns 500
 	// This failure triggers the Circuit Breaker to open because failure ratio 1/1 = 100% > 60%
 	w1 := NewCloseNotifyingRecorder()
 	req1, _ := http.NewRequest("GET", "/fail", nil)
 	router.ServeHTTP(w1, req1)
-	
+
 	// Note: 502 is returned by our proxy ErrorHandler when not OpenState
 	assert.Equal(t, http.StatusBadGateway, w1.Code)
 
@@ -107,7 +107,7 @@ func TestProxy_CircuitBreaker_ServiceUnreachable(t *testing.T) {
 	// 2. Setup Gin Router
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Any("/*path", Proxy(targetURL, "test-cb-unreachable", defaultSettings))
+	router.Any("/*path", Proxy([]string{targetURL}, "test-cb-unreachable", defaultSettings))
 
 	// 3. First Request: Should fail with 502 (Bad Gateway)
 	// The underlying transport returns an error (dial tcp ...: connect: connection refused)
@@ -127,4 +127,42 @@ func TestProxy_CircuitBreaker_ServiceUnreachable(t *testing.T) {
 
 	assert.Equal(t, http.StatusServiceUnavailable, w2.Code)
 	assert.Contains(t, w2.Body.String(), "Service unavailable")
+}
+
+func TestProxy_LoadBalancing(t *testing.T) {
+	// Track which server handled each request
+	server1Calls := 0
+	server2Calls := 0
+
+	// Create two mock servers
+	server1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server1Calls++
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"server": "1"}`))
+	}))
+	defer server1.Close()
+
+	server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server2Calls++
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"server": "2"}`))
+	}))
+	defer server2.Close()
+
+	// Setup Gin Router with load balancing
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Any("/*path", Proxy([]string{server1.URL, server2.URL}, "test-lb", defaultSettings))
+
+	// Make 10 requests
+	for i := 0; i < 10; i++ {
+		w := NewCloseNotifyingRecorder()
+		req, _ := http.NewRequest("GET", "/test", nil)
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	}
+
+	// Verify distribution (should be equal - 5 calls to each server)
+	assert.Equal(t, 5, server1Calls, "Expected 5 calls to server1")
+	assert.Equal(t, 5, server2Calls, "Expected 5 calls to server2")
 }

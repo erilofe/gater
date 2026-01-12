@@ -42,36 +42,40 @@ func (p *ConsulProvider) Close() error {
 	return nil
 }
 
-// ResolveService resolves the target URL of a service via Consul service discovery.
-// It queries the Health API for healthy instances and returns the URL of the first available instance.
-func (p *ConsulProvider) ResolveService(ctx context.Context, serviceName string) (string, error) {
-	return p.getServiceURL(ctx, serviceName)
+// ResolveService resolves the target URLs of all healthy instances of a service via Consul service discovery.
+// It queries the Health API for healthy instances and returns URLs for all available instances.
+func (p *ConsulProvider) ResolveService(ctx context.Context, serviceName string) ([]string, error) {
+	return p.getServiceURLs(ctx, serviceName)
 }
 
-// getServiceURL returns the URL (http://address:port) of a healthy instance of the service.
-func (p *ConsulProvider) getServiceURL(ctx context.Context, serviceName string) (string, error) {
+// getServiceURLs returns the URLs (http://address:port) of all healthy instances of the service.
+func (p *ConsulProvider) getServiceURLs(ctx context.Context, serviceName string) ([]string, error) {
 	opts := &api.QueryOptions{}
 	opts = opts.WithContext(ctx)
 
 	// Query only passing (healthy) services
 	entries, _, err := p.client.Health().Service(serviceName, "", true, opts)
 	if err != nil {
-		return "", fmt.Errorf("failed to query service: %w", err)
+		return nil, fmt.Errorf("failed to query service: %w", err)
 	}
 
 	if len(entries) == 0 {
-		return "", fmt.Errorf("no healthy instances found for service %q", serviceName)
+		return nil, fmt.Errorf("no healthy instances found for service %q", serviceName)
 	}
 
-	// TODO: Evaluate load balancing here
-	// Pick the first healthy instance
-	service := entries[0].Service
-	address := service.Address
+	// Collect all healthy instances
+	urls := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		service := entry.Service
+		address := service.Address
 
-	// If Service.Address is empty, fallback to Node.Address
-	if address == "" {
-		address = entries[0].Node.Address
+		// If Service.Address is empty, fallback to Node.Address
+		if address == "" {
+			address = entry.Node.Address
+		}
+
+		urls = append(urls, fmt.Sprintf("http://%s:%d", address, service.Port))
 	}
 
-	return fmt.Sprintf("http://%s:%d", address, service.Port), nil
+	return urls, nil
 }

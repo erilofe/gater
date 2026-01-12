@@ -60,12 +60,12 @@ func TestSetupRouter_Unit(t *testing.T) {
 		{
 			ServiceName: "user-service",
 			Prefix:      "/users",
-			TargetURL:   mockUserSrv.URL,
+			TargetURLs:  []string{mockUserSrv.URL},
 		},
 		{
 			ServiceName: "post-service",
 			Prefix:      "/posts",
-			TargetURL:   mockPostSrv.URL,
+			TargetURLs:  []string{mockPostSrv.URL},
 		},
 	}
 
@@ -101,19 +101,19 @@ func TestSetupRouter_MethodFiltering(t *testing.T) {
 		{
 			ServiceName: "readonly-service",
 			Prefix:      "/readonly",
-			TargetURL:   mockSrv.URL,
+			TargetURLs:  []string{mockSrv.URL},
 			Methods:     []string{"GET"},
 		},
 		{
 			ServiceName: "mixed-service",
 			Prefix:      "/mixed",
-			TargetURL:   mockSrv.URL,
+			TargetURLs:  []string{mockSrv.URL},
 			Methods:     []string{"GET", "POST"},
 		},
 		{
 			ServiceName: "all-service",
 			Prefix:      "/all",
-			TargetURL:   mockSrv.URL,
+			TargetURLs:  []string{mockSrv.URL},
 			Methods:     nil, // Should default to Any
 		},
 	}
@@ -165,8 +165,8 @@ func TestSetupRouter_Integration(t *testing.T) {
 	}
 
 	routes := []discovery.ServiceRoute{
-		{ServiceName: "user-service", Prefix: "/users", TargetURL: userURL},
-		{ServiceName: "post-service", Prefix: "/posts", TargetURL: postURL},
+		{ServiceName: "user-service", Prefix: "/users", TargetURLs: []string{userURL}},
+		{ServiceName: "post-service", Prefix: "/posts", TargetURLs: []string{postURL}},
 	}
 
 	gin.SetMode(gin.TestMode)

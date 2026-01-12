@@ -24,7 +24,7 @@ func SetupRouter(cfg *config.Config, routes []discovery.ServiceRoute) *gin.Engin
 	}
 
 	for _, route := range routes {
-		log.Printf("Configuring route: %s -> %s (%s)", route.Prefix, route.ServiceName, route.TargetURL)
+		log.Printf("Configuring route: %s -> %s (%d instances)", route.Prefix, route.ServiceName, len(route.TargetURLs))
 
 		// Create unique CB name per service
 		circuitBreakerName := route.ServiceName + "-cb"
@@ -33,10 +33,10 @@ func SetupRouter(cfg *config.Config, routes []discovery.ServiceRoute) *gin.Engin
 		// Strips the prefix before proxying
 		// For example, `/api/v1/users` with prefix `/api/v1` becomes `/users`
 		if len(route.Methods) == 0 {
-			router.Any(route.Prefix+"/*path", proxy.Proxy(route.TargetURL, circuitBreakerName, cbSettings))
+			router.Any(route.Prefix+"/*path", proxy.Proxy(route.TargetURLs, circuitBreakerName, cbSettings))
 		} else {
 			for _, method := range route.Methods {
-				router.Handle(method, route.Prefix+"/*path", proxy.Proxy(route.TargetURL, circuitBreakerName, cbSettings))
+				router.Handle(method, route.Prefix+"/*path", proxy.Proxy(route.TargetURLs, circuitBreakerName, cbSettings))
 			}
 		}
 	}
@@ -82,21 +82,21 @@ func Run() {
 	for _, routeCfg := range routeConfigs {
 		log.Printf("Resolving service: %s for path: %s", routeCfg.ServiceName, routeCfg.Path)
 
-		targetURL, err := provider.ResolveService(ctx, routeCfg.ServiceName)
+		targetURLs, err := provider.ResolveService(ctx, routeCfg.ServiceName)
 		if err != nil {
 			log.Printf("ERROR: Failed to resolve service %s: %v", routeCfg.ServiceName, err)
 			// Skip route and continue
 			continue
 		}
 
+		log.Printf("Resolved %s to %d instance(s): %v", routeCfg.ServiceName, len(targetURLs), targetURLs)
+
 		routes = append(routes, discovery.ServiceRoute{
 			ServiceName: routeCfg.ServiceName,
 			Prefix:      routeCfg.Path,
-			TargetURL:   targetURL,
+			TargetURLs:  targetURLs,
 			Methods:     routeCfg.Methods,
 		})
-
-		log.Printf("Resolved %s to %s", routeCfg.ServiceName, targetURL)
 	}
 
 	if len(routes) == 0 {

@@ -27,7 +27,7 @@ func mockConsulServer(t *testing.T, services map[string][]api.ServiceEntry) *htt
 			prefix := "/v1/health/service/"
 			if len(r.URL.Path) > len(prefix) && r.URL.Path[:len(prefix)] == prefix {
 				serviceName := r.URL.Path[len(prefix):]
-				
+
 				entries, exists := services[serviceName]
 				if !exists {
 					// Return empty list if service not found, similar to Consul
@@ -42,7 +42,7 @@ func mockConsulServer(t *testing.T, services map[string][]api.ServiceEntry) *htt
 				}
 				return
 			}
-			
+
 			http.NotFound(w, r)
 		}
 	}))
@@ -94,8 +94,8 @@ func TestConsulProvider_ResolveService(t *testing.T) {
 	defer server.Close()
 
 	// Initialize Provider pointing to mock server
-	// httptest.Server URL starts with http://, we need to strip it for some clients 
-	// but api.Config.Address expects "host:port" or "http://host:port". 
+	// httptest.Server URL starts with http://, we need to strip it for some clients
+	// but api.Config.Address expects "host:port" or "http://host:port".
 	// The standard lib consul client handles http:// prefix correctly in Address since some versions,
 	// but let's just pass the URL as is.
 	provider, err := NewConsulProvider(server.URL)
@@ -105,19 +105,24 @@ func TestConsulProvider_ResolveService(t *testing.T) {
 	tests := []struct {
 		name          string
 		serviceName   string
-		expectedURL   string
+		expectedURLs  []string
 		expectError   bool
 		errorContains string
 	}{
 		{
-			name:        "Resolve User Service",
-			serviceName: "user-service",
-			expectedURL: "http://10.0.0.1:8081",
+			name:         "Resolve User Service (Single Instance)",
+			serviceName:  "user-service",
+			expectedURLs: []string{"http://10.0.0.1:8081"},
 		},
 		{
-			name:        "Resolve Service Fallback to Node Address",
-			serviceName: "empty-address-service",
-			expectedURL: "http://192.168.1.100:8082",
+			name:         "Resolve Multi-Instance Service",
+			serviceName:  "multi-service",
+			expectedURLs: []string{"http://10.0.0.2:9090", "http://10.0.0.3:9091"},
+		},
+		{
+			name:         "Resolve Service Fallback to Node Address",
+			serviceName:  "empty-address-service",
+			expectedURLs: []string{"http://192.168.1.100:8082"},
 		},
 		{
 			name:          "Service Not Found",
@@ -129,7 +134,7 @@ func TestConsulProvider_ResolveService(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			url, err := provider.ResolveService(context.Background(), tt.serviceName)
+			urls, err := provider.ResolveService(context.Background(), tt.serviceName)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -138,7 +143,7 @@ func TestConsulProvider_ResolveService(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedURL, url)
+				assert.ElementsMatch(t, tt.expectedURLs, urls)
 			}
 		})
 	}
