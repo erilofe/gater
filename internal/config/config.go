@@ -33,10 +33,9 @@ type Config struct {
 
 // RouteConfig holds the configuration for a single route.
 type RouteConfig struct {
-	Path           string   `yaml:"path"`
-	ServiceName    string   `yaml:"service_name"`
-	Methods        []string `yaml:"methods"`
-	CircuitBreaker CircuitBreakerConfig
+	Path        string   `yaml:"path"`
+	ServiceName string   `yaml:"service_name"`
+	Methods     []string `yaml:"methods"`
 
 	// For future purpose
 	// LoadBalancer string `yaml:"load_balancer"`

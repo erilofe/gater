@@ -32,7 +32,13 @@ func SetupRouter(cfg *config.Config, routes []discovery.ServiceRoute) *gin.Engin
 		// Register the route.
 		// Strips the prefix before proxying
 		// For example, `/api/v1/users` with prefix `/api/v1` becomes `/users`
-		router.Any(route.Prefix+"/*path", proxy.Proxy(route.TargetURL, circuitBreakerName, cbSettings))
+		if len(route.Methods) == 0 {
+			router.Any(route.Prefix+"/*path", proxy.Proxy(route.TargetURL, circuitBreakerName, cbSettings))
+		} else {
+			for _, method := range route.Methods {
+				router.Handle(method, route.Prefix+"/*path", proxy.Proxy(route.TargetURL, circuitBreakerName, cbSettings))
+			}
+		}
 	}
 
 	// Health check for the gateway itself
@@ -87,6 +93,7 @@ func Run() {
 			ServiceName: routeCfg.ServiceName,
 			Prefix:      routeCfg.Path,
 			TargetURL:   targetURL,
+			Methods:     routeCfg.Methods,
 		})
 
 		log.Printf("Resolved %s to %s", routeCfg.ServiceName, targetURL)

@@ -88,6 +88,64 @@ func TestSetupRouter_Unit(t *testing.T) {
 	assert.JSONEq(t, `{"service":"post"}`, w.Body.String())
 }
 
+func TestSetupRouter_MethodFiltering(t *testing.T) {
+	// Mock Service
+	mockSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer mockSrv.Close()
+
+	cfg := &config.Config{} // Default config
+
+	routes := []discovery.ServiceRoute{
+		{
+			ServiceName: "readonly-service",
+			Prefix:      "/readonly",
+			TargetURL:   mockSrv.URL,
+			Methods:     []string{"GET"},
+		},
+		{
+			ServiceName: "mixed-service",
+			Prefix:      "/mixed",
+			TargetURL:   mockSrv.URL,
+			Methods:     []string{"GET", "POST"},
+		},
+		{
+			ServiceName: "all-service",
+			Prefix:      "/all",
+			TargetURL:   mockSrv.URL,
+			Methods:     nil, // Should default to Any
+		},
+	}
+
+	gin.SetMode(gin.TestMode)
+	router := SetupRouter(cfg, routes)
+
+	// Case 1: GET Allowed
+	w := NewCloseNotifyingRecorder()
+	req, _ := http.NewRequest("GET", "/readonly/test", nil)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "GET should be allowed on /readonly")
+
+	// Case 2: POST Denied (Gin defaults to 404 for unmatched method/path combo)
+	w = NewCloseNotifyingRecorder()
+	req, _ = http.NewRequest("POST", "/readonly/test", nil)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code, "POST should be denied (404) on /readonly")
+
+	// Case 3: Mixed Allowed
+	w = NewCloseNotifyingRecorder()
+	req, _ = http.NewRequest("POST", "/mixed/test", nil)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "POST should be allowed on /mixed")
+
+	// Case 4: Default All Allowed
+	w = NewCloseNotifyingRecorder()
+	req, _ = http.NewRequest("DELETE", "/all/test", nil)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "DELETE should be allowed on /all (default)")
+}
+
 // TestSetupRouter_Integration runs only if the environment variables for services are set.
 // It verifies that we can pass URLs from env vars into the router configuration manually.
 func TestSetupRouter_Integration(t *testing.T) {

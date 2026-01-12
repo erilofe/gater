@@ -5,4 +5,5 @@ type ServiceRoute struct {
 	ServiceName string
 	Prefix      string
 	TargetURL   string
+	Methods     []string
 }
