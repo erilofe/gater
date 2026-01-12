@@ -60,7 +60,7 @@ func (p *ConsulProvider) getServiceURL(ctx context.Context, serviceName string) 
 	}
 
 	if len(entries) == 0 {
-		return "", fmt.Errorf("no healthy instances found")
+		return "", fmt.Errorf("no healthy instances found for service %q", serviceName)
 	}
 
 	// TODO: Evaluate load balancing here

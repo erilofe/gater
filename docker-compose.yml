@@ -1,28 +1,20 @@
 services:
-  user:
-    image: hashicorp/http-echo
-    command: -text='{"service":"user", "status":"ok"}' -listen=:8081
-    ports:
-      - "8081:8081"
-    restart: always
-
-  post:
-    image: hashicorp/http-echo
-    command: -text='{"service":"post", "status":"ok"}' -listen=:8082
-    ports:
-      - "8082:8082"
-    restart: always
-
   gater:
     build:
       context: .
       dockerfile: Dockerfile
     depends_on:
-      - user
-      - post
+      - consul
     ports:
       - "8080:8080"
     environment:
-      - USER_SERVICE_URL=http://user:8081
-      - POST_SERVICE_URL=http://post:8082
+      - DISCOVERY_PROVIDER=consul
+      - CONSUL_ADDRESS=consul:8500
     restart: always
+
+  consul:
+    image: hashicorp/consul:latest
+    restart: always
+    ports:
+      - "8500:8500"
+    command: agent -server -bootstrap -ui -client=0.0.0.0 -data-dir=/consul/data

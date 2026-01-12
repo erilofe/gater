@@ -12,7 +12,7 @@ import (
 )
 
 // Proxy forwards incoming requests to the target URL specified in the request URI.
-func Proxy(target string, cbName string, cbSettings circuitbreaker.Settings) gin.HandlerFunc {
+func Proxy(target string, circuitBreakerName string, circuitBreakerSettings circuitbreaker.Settings) gin.HandlerFunc {
 	remote, err := url.Parse(target)
 
 	if err != nil {
@@ -24,7 +24,7 @@ func Proxy(target string, cbName string, cbSettings circuitbreaker.Settings) gin
 	// Create the reverse proxy once
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 
-	cb := circuitbreaker.NewCircuitBreaker(cbName, cbSettings)
+	cb := circuitbreaker.NewCircuitBreaker(circuitBreakerName, circuitBreakerSettings)
 
 	proxy.Transport = circuitbreaker.NewCircuitBreakerTransport(cb, http.DefaultTransport)
 

@@ -17,7 +17,10 @@ const (
 
 // NewProvider creates the appropriate service discovery provider based on configuration.
 func NewProvider(cfg *config.Config) (Provider, error) {
-	providerType := determineProviderType(cfg)
+	providerType, err := determineProviderType(cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	switch providerType {
 	case ProviderTypeConsul:
@@ -32,20 +35,10 @@ func NewProvider(cfg *config.Config) (Provider, error) {
 }
 
 // determineProviderType decides which provider to use based on configuration.
-func determineProviderType(cfg *config.Config) ProviderType {
-	// Priority:
-	// 1. DISCOVERY_PROVIDER explicit setting (if set)
-	// 2. Auto-detection based on available config
-
-	if cfg.DiscoveryProvider != "" {
-		return ProviderType(strings.ToLower(cfg.DiscoveryProvider))
+func determineProviderType(cfg *config.Config) (ProviderType, error) {
+	if cfg.DiscoveryProvider == "" {
+		return "", fmt.Errorf("service discovery provider not configured: set DISCOVERY_PROVIDER (e.g., 'consul')")
 	}
 
-	// Auto-detection: if CONSUL_ADDRESS is present, use Consul
-	if cfg.ConsulAddress != "" {
-		return ProviderTypeConsul
-	}
-
-	// Default fallback
-	return ProviderTypeConsul
+	return ProviderType(strings.ToLower(cfg.DiscoveryProvider)), nil
 }

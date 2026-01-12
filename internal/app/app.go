@@ -27,12 +27,12 @@ func SetupRouter(cfg *config.Config, routes []discovery.ServiceRoute) *gin.Engin
 		log.Printf("Configuring route: %s -> %s (%s)", route.Prefix, route.ServiceName, route.TargetURL)
 
 		// Create unique CB name per service
-		cbName := route.ServiceName + "-cb"
+		circuitBreakerName := route.ServiceName + "-cb"
 
 		// Register the route.
 		// Strips the prefix before proxying
 		// For example, `/api/v1/users` with prefix `/api/v1` becomes `/users`
-		router.Any(route.Prefix+"/*path", proxy.Proxy(route.TargetURL, cbName, cbSettings))
+		router.Any(route.Prefix+"/*path", proxy.Proxy(route.TargetURL, circuitBreakerName, cbSettings))
 	}
 
 	// Health check for the gateway itself

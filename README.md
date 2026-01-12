@@ -104,8 +104,8 @@ docker compose -f docker-compose.test.yml -p gater-test down
 Example bootstrap output:
 
 ```
-AccessorID:       ceb60d9b-795c-0248-708b-9a7d9382d58f
-SecretID:         a0360496-9669-b859-5563-3015259d6da7
+AccessorID:       xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+SecretID:         xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 Description:      Bootstrap Token (Global Management)
 Local:            false
 Create Time:      2026-01-04 19:18:15.825222154 +0000 UTC
