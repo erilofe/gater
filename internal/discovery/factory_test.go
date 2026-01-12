@@ -54,3 +54,42 @@ func TestDetermineProviderType(t *testing.T) {
 		})
 	}
 }
+
+func TestNewProvider(t *testing.T) {
+	// Start a mock Consul server (reusing helper from consul_test.go)
+	server := mockConsulServer(t, nil)
+	defer server.Close()
+
+	t.Run("Create Consul Provider", func(t *testing.T) {
+		cfg := &config.Config{
+			DiscoveryProvider: "consul",
+			ConsulAddress:     server.URL,
+		}
+
+		p, err := NewProvider(cfg)
+		assert.NoError(t, err)
+		assert.NotNil(t, p)
+		assert.Equal(t, "consul", p.Name())
+	})
+
+	t.Run("Unknown Provider", func(t *testing.T) {
+		cfg := &config.Config{
+			DiscoveryProvider: "alien_tech",
+		}
+
+		p, err := NewProvider(cfg)
+		assert.Error(t, err)
+		assert.Nil(t, p)
+		assert.Contains(t, err.Error(), "unknown provider type")
+	})
+
+	t.Run("Missing Configuration", func(t *testing.T) {
+		cfg := &config.Config{
+			DiscoveryProvider: "",
+		}
+
+		p, err := NewProvider(cfg)
+		assert.Error(t, err)
+		assert.Nil(t, p)
+	})
+}
