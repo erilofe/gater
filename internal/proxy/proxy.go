@@ -23,48 +23,62 @@ func Proxy(targets []string, circuitBreakerName string, circuitBreakerSettings c
 	}
 
 	// Create load balancer once per route
-	lb := loadbalancer.NewRoundRobin(targets)
+	loadBalancer := loadbalancer.NewRoundRobin(targets)
 
 	// Create circuit breaker
-	cb := circuitbreaker.NewCircuitBreaker(circuitBreakerName, circuitBreakerSettings)
+	circuitBreaker := circuitbreaker.NewCircuitBreaker(circuitBreakerName, circuitBreakerSettings)
 
-	return func(c *gin.Context) {
-		// Get next target from load balancer (per request)
-		target := lb.Next()
-		if target == "" {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No targets available"})
-			return
-		}
+	// Build and cache reverse proxies once (per target) during initialization
+	proxies := make(map[string]*httputil.ReverseProxy, len(targets))
 
-		// Parse target URL
+	for _, target := range targets {
 		remote, err := url.Parse(target)
 		if err != nil {
 			log.Printf("Failed to parse target URL %s: %v", target, err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid target URL"})
-			return
+			continue
 		}
 
-		// Create reverse proxy for this request
-		proxy := httputil.NewSingleHostReverseProxy(remote)
-		proxy.Transport = circuitbreaker.NewCircuitBreakerTransport(cb, http.DefaultTransport)
+		reverseProxy := httputil.NewSingleHostReverseProxy(remote)
+		reverseProxy.Transport = circuitbreaker.NewCircuitBreakerTransport(circuitBreaker, http.DefaultTransport)
 
-		proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+		// Custom error handler to manage circuit breaker open state
+		reverseProxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
 			if err == gobreaker.ErrOpenState {
 				rw.WriteHeader(http.StatusServiceUnavailable)
 				rw.Write([]byte("Service unavailable due to high failure rate"))
 				return
 			}
 
-			log.Printf("Reverse proxy error for %s -> %s: %v", req.URL.String(), target, err)
+			log.Printf("Reverse proxy error for %s: %v", req.URL.String(), err)
 			rw.WriteHeader(http.StatusBadGateway)
 			rw.Write([]byte("Bad gateway"))
 		}
 
-		originalDirector := proxy.Director
-		proxy.Director = func(req *http.Request) {
+		originalDirector := reverseProxy.Director
+		reverseProxy.Director = func(req *http.Request) {
 			originalDirector(req)
 			req.Host = remote.Host
 			req.Header.Add("X-Forwarded-Host", req.Host)
+		}
+
+		proxies[target] = reverseProxy
+	}
+
+	return func(c *gin.Context) {
+		// Get next target from load balancer (per request)
+		target := loadBalancer.Next()
+		if target == "" {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No targets available"})
+			return
+		}
+
+		// Select previously built proxy for this request's target
+		proxy := proxies[target]
+
+		if proxy == nil {
+			log.Printf("No reverse proxy available for target %s", target)
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No healthy targets available"})
+			return
 		}
 
 		// Serve the request
