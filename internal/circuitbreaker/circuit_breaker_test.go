@@ -76,7 +76,7 @@ func TestCircuitBreakerTransport_RoundTrip_5xxError(t *testing.T) {
 	// The transport implementation returns nil, http.ErrHandlerTimeout (or similar) wrapped in the CB error
 	// when a 5xx is encountered because the Execute func returns an error.
 	assert.Error(t, err)
-	
+
 	// Because 1 failure / 1 request = 100% > 60%, the breaker trips immediately.
 	// Gobreaker resets counts on state change, so we check state instead of counts.
 	assert.Equal(t, gobreaker.StateOpen, cb.State())
@@ -99,7 +99,7 @@ func TestCircuitBreakerTransport_RoundTrip_NetworkError(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Equal(t, expectedErr, err)
-	
+
 	// Because 1 failure / 1 request = 100% > 60%, the breaker trips immediately.
 	assert.Equal(t, gobreaker.StateOpen, cb.State())
 }

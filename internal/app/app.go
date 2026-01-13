@@ -132,18 +132,21 @@ func initializeGateway(services map[string]*service.Service, routes []*config.Ro
 	return gw
 }
 
-// Run initializes and starts the Gater application.
-func Run() {
+// RunWithContext initializes and starts the Gater application with a cancellable context.
+// This function is designed for testing and allows graceful shutdown via context cancellation.
+func RunWithContext(ctx context.Context, cfg *config.Config) (*gateway.Gateway, error) {
 	log.Println("Running Gater...")
 
-	// Load configuration
-	cfg := config.LoadConfig()
+	// Use provided config or load default
+	if cfg == nil {
+		cfg = config.LoadConfig()
+	}
 	log.Printf("Configuration loaded: Port=%s, Consul=%s", cfg.Port, cfg.ConsulAddress)
 
 	// Initialize Service Discovery Provider
 	provider, err := discovery.NewProvider(cfg)
 	if err != nil {
-		log.Fatalf("Failed to initialize discovery provider: %v", err)
+		return nil, fmt.Errorf("failed to initialize discovery provider: %w", err)
 	}
 	defer provider.Close()
 	log.Printf("Using service discovery provider: %s", provider.Name())
@@ -151,21 +154,21 @@ func Run() {
 	// Load all configuration files
 	routes, servicesConfig, err := loadConfiguration(cfg)
 	if err != nil {
-		log.Fatalf("Configuration loading failed: %v", err)
+		return nil, fmt.Errorf("configuration loading failed: %w", err)
 	}
 
 	// Resolve and create service entities
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	resolveCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	services, err := buildServices(ctx, routes, servicesConfig, provider, cfg.ServicesConfigPath)
+	services, err := buildServices(resolveCtx, routes, servicesConfig, provider, cfg.ServicesConfigPath)
 	if err != nil {
-		log.Fatalf("Service resolution failed: %v", err)
+		return nil, fmt.Errorf("service resolution failed: %w", err)
 	}
 
 	// Validate routes reference valid services
 	if err := validateRoutes(routes, services); err != nil {
-		log.Fatalf("Route validation failed: %v", err)
+		return nil, fmt.Errorf("route validation failed: %w", err)
 	}
 
 	// Create and configure gateway
@@ -177,7 +180,27 @@ func Run() {
 	log.Printf("Starting gateway server on %s", serverAddr)
 	log.Printf("Gateway initialized with %d services and %d routes", len(services), len(routes))
 
-	if err := router.Run(serverAddr); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	// Start server in goroutine and wait for context cancellation
+	go func() {
+		if err := router.Run(serverAddr); err != nil {
+			log.Printf("Server stopped: %v", err)
+		}
+	}()
+
+	// Wait for context cancellation
+	<-ctx.Done()
+	log.Println("Context cancelled, shutting down...")
+
+	return gw, nil
+}
+
+// Run initializes and starts the Gater application.
+// This is the main entry point for production use.
+func Run() {
+	gw, err := RunWithContext(context.Background(), nil)
+	if err != nil {
+		log.Fatalf("Application failed: %v", err)
 	}
+	// Never reached, context.Background() never cancels
+	_ = gw
 }

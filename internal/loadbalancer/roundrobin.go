@@ -41,8 +41,3 @@ func (r *RoundRobin) Next() string {
 	idx := (atomic.AddUint64(&r.counter, 1) - 1) % uint64(len(r.targets))
 	return r.targets[idx]
 }
-
-// Targets returns all available targets.
-func (r *RoundRobin) Targets() []string {
-	return r.targets
-}

@@ -135,8 +135,3 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Service) GetInstances() []*ServiceInstance {
 	return s.Instances
 }
-
-// GetName returns the service name
-func (s *Service) GetName() string {
-	return s.Name
-}

@@ -275,74 +275,6 @@ func TestGateway_UnknownServiceInRoute(t *testing.T) {
 	})
 }
 
-func TestGateway_GetService(t *testing.T) {
-	backend := createMockBackend(`{"ok":true}`, http.StatusOK)
-	defer backend.Close()
-
-	svc, err := createTestService("test-service", []string{backend.URL})
-	require.NoError(t, err)
-
-	services := map[string]*service.Service{
-		"test-service": svc,
-	}
-
-	routes := []*config.Route{}
-
-	gw := NewGateway(services, routes)
-
-	// Test getting existing service
-	t.Run("Get existing service", func(t *testing.T) {
-		retrievedSvc, exists := gw.GetService("test-service")
-		assert.True(t, exists)
-		assert.Equal(t, svc, retrievedSvc)
-	})
-
-	// Test getting non-existent service
-	t.Run("Get non-existent service", func(t *testing.T) {
-		_, exists := gw.GetService("non-existent")
-		assert.False(t, exists)
-	})
-}
-
-func TestGateway_GetServices(t *testing.T) {
-	backend := createMockBackend(`{"ok":true}`, http.StatusOK)
-	defer backend.Close()
-
-	svc1, err := createTestService("service-1", []string{backend.URL})
-	require.NoError(t, err)
-
-	svc2, err := createTestService("service-2", []string{backend.URL})
-	require.NoError(t, err)
-
-	services := map[string]*service.Service{
-		"service-1": svc1,
-		"service-2": svc2,
-	}
-
-	routes := []*config.Route{}
-
-	gw := NewGateway(services, routes)
-
-	retrievedServices := gw.GetServices()
-	assert.Equal(t, 2, len(retrievedServices))
-	assert.Equal(t, services, retrievedServices)
-}
-
-func TestGateway_GetRoutes(t *testing.T) {
-	services := map[string]*service.Service{}
-
-	routes := []*config.Route{
-		{Path: "/users", ServiceName: "user-service", Methods: []string{"GET"}, Priority: 1},
-		{Path: "/posts", ServiceName: "post-service", Methods: []string{"GET"}, Priority: 1},
-	}
-
-	gw := NewGateway(services, routes)
-
-	retrievedRoutes := gw.GetRoutes()
-	assert.Equal(t, 2, len(retrievedRoutes))
-	assert.Equal(t, routes, retrievedRoutes)
-}
-
 func TestGateway_MultipleInstances(t *testing.T) {
 	// Create multiple backend servers
 	backend1 := createMockBackend(`{"instance":"1"}`, http.StatusOK)
@@ -406,9 +338,9 @@ func TestGateway_PrefixMatching(t *testing.T) {
 	router := gw.SetupRouter()
 
 	testCases := []struct {
-		name         string
-		path         string
-		shouldWork   bool
+		name          string
+		path          string
+		shouldWork    bool
 		allowRedirect bool // Gin may redirect when path doesn't end with /
 	}{
 		{"Exact match", "/api/v1/users", true, true}, // Gin redirects to /api/v1/users/

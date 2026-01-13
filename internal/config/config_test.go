@@ -33,8 +33,8 @@ routes:
 			createFile:    true,
 			expectedError: false,
 			expectedRoutes: []*Route{
-				{Path: "", ServiceName: "user-service", Methods: []string{"GET", "POST"}, Priority: 0},
-				{Path: "", ServiceName: "order-service", Methods: []string{"GET"}, Priority: 0},
+				{Path: "/api/v1/users", ServiceName: "user-service", Methods: []string{"GET", "POST"}, Priority: 0},
+				{Path: "/api/v1/orders", ServiceName: "order-service", Methods: []string{"GET"}, Priority: 0},
 			},
 		},
 		{
@@ -48,7 +48,7 @@ routes:
 			createFile:    true,
 			expectedError: false,
 			expectedRoutes: []*Route{
-				{Path: "", ServiceName: "user-service", Methods: []string{"GET", "POST"}, Priority: 0},
+				{Path: "/api/v1/users", ServiceName: "user-service", Methods: []string{"GET", "POST"}, Priority: 0},
 			},
 		},
 		{
@@ -61,7 +61,7 @@ routes:
 			createFile:    true,
 			expectedError: false,
 			expectedRoutes: []*Route{
-				{Path: "", ServiceName: "user-service", Methods: []string{}, Priority: 0},
+				{Path: "/api/v1/users", ServiceName: "user-service", Methods: []string{}, Priority: 0},
 			},
 		},
 		{
@@ -76,7 +76,7 @@ routes:
 			createFile:    true,
 			expectedError: false,
 			expectedRoutes: []*Route{
-				{Path: "", ServiceName: "user-service", Methods: []string{"GET"}, Priority: 10},
+				{Path: "/api/v1/users", ServiceName: "user-service", Methods: []string{"GET"}, Priority: 10},
 			},
 		},
 		{
@@ -211,7 +211,7 @@ routes:
 			createFile:    true,
 			expectedError: false,
 			expectedRoutes: []*Route{
-				{Path: "", ServiceName: "root-service", Methods: []string{"GET"}, Priority: 0},
+				{Path: "/", ServiceName: "root-service", Methods: []string{"GET"}, Priority: 0},
 			},
 		},
 	}

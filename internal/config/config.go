@@ -8,8 +8,8 @@ import (
 
 // Config holds the application configuration.
 type Config struct {
-	Port           string
-	ConsulAddress  string
+	Port          string
+	ConsulAddress string
 
 	// Service Discovery
 	DiscoveryProvider string

@@ -72,17 +72,6 @@ func TestRoundRobin_Concurrency(t *testing.T) {
 	}
 }
 
-func TestRoundRobin_Targets(t *testing.T) {
-	targets := []string{
-		"http://localhost:8080",
-		"http://localhost:8081",
-	}
-	lb := NewRoundRobin(targets)
-
-	// Verify Targets() returns all targets
-	assert.ElementsMatch(t, targets, lb.Targets())
-}
-
 func TestNewRoundRobin_NilSlice(t *testing.T) {
 	lb := NewRoundRobin(nil)
 	assert.NotNil(t, lb)

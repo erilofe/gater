@@ -75,19 +75,3 @@ func (g *Gateway) healthCheck(c *gin.Context) {
 		"routes":   len(g.routes),
 	})
 }
-
-// GetService returns a service by name (for monitoring/management)
-func (g *Gateway) GetService(name string) (*service.Service, bool) {
-	svc, exists := g.services[name]
-	return svc, exists
-}
-
-// GetServices returns all services
-func (g *Gateway) GetServices() map[string]*service.Service {
-	return g.services
-}
-
-// GetRoutes returns all routes
-func (g *Gateway) GetRoutes() []*config.Route {
-	return g.routes
-}

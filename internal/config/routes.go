@@ -123,9 +123,8 @@ func LoadRoutesFromFile(filepath string) ([]*Route, error) {
 			return nil, fmt.Errorf("route %s: %w", routeCfg.Path, err)
 		}
 
-		var path string
-
 		// Normalize trailing slash (keep "/" as-is)
+		path := routeCfg.Path
 		if len(routeCfg.Path) > 1 && strings.HasSuffix(routeCfg.Path, "/") {
 			path = strings.TrimRight(routeCfg.Path, "/")
 		}
