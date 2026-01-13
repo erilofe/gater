@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -116,11 +117,35 @@ func LoadRoutesFromFile(filepath string) ([]RouteConfig, error) {
 		return nil, fmt.Errorf("failed to parse routes YAML: %w", err)
 	}
 
-	// Validation
 	for i, route := range config.Routes {
 		if route.Path == "" || route.ServiceName == "" {
 			return nil, fmt.Errorf("route %d: path and service_name are required", i)
 		}
+
+		// Enforce safe route prefix rules
+		if route.Path[0] != '/' {
+			return nil, fmt.Errorf("route %d: path must start with '/'", i)
+		}
+		if strings.ContainsAny(route.Path, " \t\r\n") {
+			return nil, fmt.Errorf("route %d: path must not contain whitespace", i)
+		}
+		if strings.ContainsAny(route.Path, "?#") {
+			return nil, fmt.Errorf("route %d: path must not contain '?' or '#'", i)
+		}
+		if strings.Contains(route.Path, "//") {
+			return nil, fmt.Errorf("route %d: path must not contain consecutive slashes ('//')", i)
+		}
+		if strings.ContainsAny(route.Path, ":*") {
+			return nil, fmt.Errorf("route %d: path must not contain ':' or '*' (use a static prefix only)", i)
+		}
+
+		// Normalize trailing slash (keep "/" as-is)
+		if len(route.Path) > 1 && strings.HasSuffix(route.Path, "/") {
+			route.Path = strings.TrimRight(route.Path, "/")
+		}
+
+		// Persist normalization back into slice
+		config.Routes[i] = route
 	}
 
 	return config.Routes, nil

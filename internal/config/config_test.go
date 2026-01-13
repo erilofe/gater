@@ -38,6 +38,34 @@ routes:
 			},
 		},
 		{
+			name: "Success - Trailing Slash Normalized",
+			yamlContent: `
+routes:
+  - path: /users/
+    service_name: user-service
+    methods: [GET]
+`,
+			createFile:    true,
+			expectedError: false,
+			expectedRoutes: []RouteConfig{
+				{Path: "/users", ServiceName: "user-service", Methods: []string{"GET"}},
+			},
+		},
+		{
+			name: "Success - Methods Normalized (Trim + Uppercase)",
+			yamlContent: `
+routes:
+  - path: /users
+    service_name: user-service
+    methods: [" get ", "post"]
+`,
+			createFile:    true,
+			expectedError: false,
+			expectedRoutes: []RouteConfig{
+				{Path: "/users", ServiceName: "user-service", Methods: []string{"GET", "POST"}},
+			},
+		},
+		{
 			name:          "Failure - File Not Found",
 			createFile:    false,
 			expectedError: true,
@@ -66,6 +94,61 @@ routes:
 			errorContains: "path and service_name are required",
 		},
 		{
+			name: "Failure - Path Missing Leading Slash",
+			yamlContent: `
+routes:
+  - path: users
+    service_name: user-service
+`,
+			createFile:    true,
+			expectedError: true,
+			errorContains: "path must start with '/'",
+		},
+		{
+			name: "Failure - Path Contains Whitespace",
+			yamlContent: `
+routes:
+  - path: /api v1/users
+    service_name: user-service
+`,
+			createFile:    true,
+			expectedError: true,
+			errorContains: "path must not contain whitespace",
+		},
+		{
+			name: "Failure - Path Contains Query Or Fragment",
+			yamlContent: `
+routes:
+  - path: /users?debug=true
+    service_name: user-service
+`,
+			createFile:    true,
+			expectedError: true,
+			errorContains: "path must not contain '?' or '#'",
+		},
+		{
+			name: "Failure - Path Contains Double Slash",
+			yamlContent: `
+routes:
+  - path: /users//admin
+    service_name: user-service
+`,
+			createFile:    true,
+			expectedError: true,
+			errorContains: "consecutive slashes",
+		},
+		{
+			name: "Failure - Path Contains Param Or Wildcard Tokens",
+			yamlContent: `
+routes:
+  - path: /users/:id
+    service_name: user-service
+`,
+			createFile:    true,
+			expectedError: true,
+			errorContains: "use a static prefix only",
+		},
+		{
 			name: "Failure - Missing Service Name",
 			yamlContent: `
 routes:
@@ -74,6 +157,42 @@ routes:
 			createFile:    true,
 			expectedError: true,
 			errorContains: "path and service_name are required",
+		},
+		{
+			name: "Failure - Invalid Method",
+			yamlContent: `
+routes:
+  - path: /users
+    service_name: user-service
+    methods: [FETCH]
+`,
+			createFile:    true,
+			expectedError: true,
+			errorContains: "invalid method",
+		},
+		{
+			name: "Failure - Empty Method Value",
+			yamlContent: `
+routes:
+  - path: /users
+    service_name: user-service
+    methods: ["   "]
+`,
+			createFile:    true,
+			expectedError: true,
+			errorContains: "methods must not contain empty values",
+		},
+		{
+			name: "Failure - Duplicate Method (After Normalization)",
+			yamlContent: `
+routes:
+  - path: /users
+    service_name: user-service
+    methods: ["get", " GET "]
+`,
+			createFile:    true,
+			expectedError: true,
+			errorContains: "duplicate method",
 		},
 	}
 
