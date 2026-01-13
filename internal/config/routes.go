@@ -24,6 +24,64 @@ type routeConfigYAML struct {
 	Priority    int      `yaml:"priority"` // Optional, defaults to 0
 }
 
+// validateRoutePath enforces safe route prefix rules
+func validateRoutePath(path string) error {
+	// Path must start with '/'
+	if path[0] != '/' {
+		return fmt.Errorf("route %s: path must start with '/'", path)
+	}
+
+	// Path must not contain whitespace
+	if strings.ContainsAny(path, " \t\r\n") {
+		return fmt.Errorf("route %s: path must not contain whitespace", path)
+	}
+
+	// Path must not contain '?' or '#'
+	if strings.ContainsAny(path, "?#") {
+		return fmt.Errorf("route \"%s\": path must not contain '?' or '#'", path)
+	}
+
+	// Path must not contain consecutive slashes
+	if strings.Contains(path, "//") {
+		return fmt.Errorf("route \"%s\": path must not contain consecutive slashes ('//')", path)
+	}
+
+	// Path must not contain ':' or '*'
+	if strings.ContainsAny(path, ":*") {
+		return fmt.Errorf("route \"%s\": path must not contain ':' or '*' (use a static prefix only)", path)
+	}
+
+	return nil
+}
+
+// normalizeRouteMethods normalizes HTTP methods to uppercase and validates them
+func normalizeRouteMethods(methods []string) ([]string, error) {
+	normalized := make([]string, 0, len(methods))
+	seen := make(map[string]struct{}) // To avoid duplicates
+
+	for _, method := range methods {
+		// Normalize to uppercase and trim spaces
+		m := strings.ToUpper(strings.TrimSpace(method))
+
+		// Skip empty methods
+		if m == "" {
+			continue
+		}
+
+		if _, exists := seen[m]; !exists {
+			seen[m] = struct{}{}
+			normalized = append(normalized, m)
+		}
+	}
+
+	// If all methods were empty, return an error
+	if len(normalized) == 0 && len(methods) > 0 {
+		return nil, fmt.Errorf("route methods are empty after normalization")
+	}
+
+	return normalized, nil
+}
+
 // LoadRoutesFromFile loads route configuration from a YAML file
 func LoadRoutesFromFile(filepath string) ([]*Route, error) {
 	if filepath == "" {
@@ -55,31 +113,26 @@ func LoadRoutesFromFile(filepath string) ([]*Route, error) {
 		}
 
 		// Enforce safe route prefix rules
-		if routeCfg.Path[0] != '/' {
-			return nil, fmt.Errorf("route %d: path must start with '/'", i)
-		}
-		if strings.ContainsAny(routeCfg.Path, " \t\r\n") {
-			return nil, fmt.Errorf("route %d: path must not contain whitespace", i)
-		}
-		if strings.ContainsAny(routeCfg.Path, "?#") {
-			return nil, fmt.Errorf("route %d: path must not contain '?' or '#'", i)
-		}
-		if strings.Contains(routeCfg.Path, "//") {
-			return nil, fmt.Errorf("route %d: path must not contain consecutive slashes ('//')", i)
-		}
-		if strings.ContainsAny(routeCfg.Path, ":*") {
-			return nil, fmt.Errorf("route %d: path must not contain ':' or '*' (use a static prefix only)", i)
+		if err := validateRoutePath(routeCfg.Path); err != nil {
+			return nil, err
 		}
 
+		// Normalize and validate HTTP methods
+		normalizedMethods, err := normalizeRouteMethods(routeCfg.Methods)
+		if err != nil {
+			return nil, fmt.Errorf("route %s: %w", routeCfg.Path, err)
+		}
+
+		var path string
+
 		// Normalize trailing slash (keep "/" as-is)
-		path := routeCfg.Path
-		if len(path) > 1 && strings.HasSuffix(path, "/") {
-			path = strings.TrimRight(path, "/")
+		if len(routeCfg.Path) > 1 && strings.HasSuffix(routeCfg.Path, "/") {
+			path = strings.TrimRight(routeCfg.Path, "/")
 		}
 
 		routes = append(routes, &Route{
 			Path:        path,
-			Methods:     routeCfg.Methods,
+			Methods:     normalizedMethods,
 			ServiceName: routeCfg.ServiceName,
 			Priority:    routeCfg.Priority,
 		})

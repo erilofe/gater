@@ -33,23 +33,58 @@ routes:
 			createFile:    true,
 			expectedError: false,
 			expectedRoutes: []*Route{
-				{Path: "/api/v1/users", ServiceName: "user-service", Methods: []string{"GET", "POST"}, Priority: 0},
-				{Path: "/api/v1/orders", ServiceName: "order-service", Methods: []string{"GET"}, Priority: 0},
+				{Path: "", ServiceName: "user-service", Methods: []string{"GET", "POST"}, Priority: 0},
+				{Path: "", ServiceName: "order-service", Methods: []string{"GET"}, Priority: 0},
 			},
 		},
 		{
-			name: "Success - Trailing Slash Normalized",
+			name: "Success - Methods Normalized (case/whitespace/dedup)",
 			yamlContent: `
 routes:
-  - path: /users/
+  - path: /api/v1/users
     service_name: user-service
-    methods: [GET]
+    methods: [get, " POST ", GET, ""]
 `,
 			createFile:    true,
 			expectedError: false,
 			expectedRoutes: []*Route{
-				{Path: "/users", ServiceName: "user-service", Methods: []string{"GET"}, Priority: 0},
+				{Path: "", ServiceName: "user-service", Methods: []string{"GET", "POST"}, Priority: 0},
 			},
+		},
+		{
+			name: "Success - Methods Empty Means All Methods",
+			yamlContent: `
+routes:
+  - path: /api/v1/users
+    service_name: user-service
+`,
+			createFile:    true,
+			expectedError: false,
+			expectedRoutes: []*Route{
+				{Path: "", ServiceName: "user-service", Methods: []string{}, Priority: 0},
+			},
+		},
+		{
+			name: "Success - Priority Parsed",
+			yamlContent: `
+routes:
+  - path: /api/v1/users
+    service_name: user-service
+    methods: [GET]
+    priority: 10
+`,
+			createFile:    true,
+			expectedError: false,
+			expectedRoutes: []*Route{
+				{Path: "", ServiceName: "user-service", Methods: []string{"GET"}, Priority: 10},
+			},
+		},
+		{
+			name:          "Failure - Empty Filepath",
+			createFile:    true,
+			yamlContent:   "",
+			expectedError: true,
+			errorContains: "routes config filepath is empty",
 		},
 		{
 			name:          "Failure - File Not Found",
@@ -68,6 +103,15 @@ routes:
 			createFile:    true,
 			expectedError: true,
 			errorContains: "failed to parse routes YAML",
+		},
+		{
+			name: "Failure - No Routes Defined",
+			yamlContent: `
+routes: []
+`,
+			createFile:    true,
+			expectedError: true,
+			errorContains: "no routes defined",
 		},
 		{
 			name: "Failure - Missing Path",
@@ -144,12 +188,40 @@ routes:
 			expectedError: true,
 			errorContains: "path and service_name are required",
 		},
+		{
+			name: "Failure - Methods All Empty After Normalization",
+			yamlContent: `
+routes:
+  - path: /api/v1/users
+    service_name: user-service
+    methods: ["", "   "]
+`,
+			createFile:    true,
+			expectedError: true,
+			errorContains: "methods are empty after normalization",
+		},
+		{
+			name: "Success - Path Is Root Kept",
+			yamlContent: `
+routes:
+  - path: /
+    service_name: root-service
+    methods: [GET]
+`,
+			createFile:    true,
+			expectedError: false,
+			expectedRoutes: []*Route{
+				{Path: "", ServiceName: "root-service", Methods: []string{"GET"}, Priority: 0},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var path string
-			if tt.createFile {
+			if tt.name == "Failure - Empty Filepath" {
+				path = ""
+			} else if tt.createFile {
 				// Create a temporary file for the test
 				tmpFile, err := os.CreateTemp("", "routes_*.yml")
 				require.NoError(t, err)
