@@ -30,8 +30,7 @@ func SetupRouter(cfg *config.Config, routes []discovery.ServiceRoute) *gin.Engin
 		circuitBreakerName := route.ServiceName + "-cb"
 
 		// Register the route.
-		// Strips the prefix before proxying
-		// For example, `/api/v1/users` with prefix `/api/v1` becomes `/users`
+		// Note: this only matches requests under the configured prefix (e.g. `/api/v1/*path`).
 		if len(route.Methods) == 0 {
 			router.Any(route.Prefix+"/*path", proxy.Proxy(route.TargetURLs, circuitBreakerName, cbSettings))
 		} else {
