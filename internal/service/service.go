@@ -14,6 +14,20 @@ import (
 	"github.com/sony/gobreaker"
 )
 
+// ValidatingTransport validates that the Director properly configured the request
+type ValidatingTransport struct {
+	underlying http.RoundTripper
+}
+
+// RoundTrip validates the request before forwarding to the underlying transport
+func (t *ValidatingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Validate that the Director configured the request properly
+	if req.URL.Host == "" || req.URL.Scheme == "" {
+		return nil, fmt.Errorf("request not properly configured by director")
+	}
+	return t.underlying.RoundTrip(req)
+}
+
 // Service represents a backend service with all its operational policies
 type Service struct {
 	Name           string
@@ -71,24 +85,29 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 	}
 
 	// 4. Create circuit breaker with service-specific name
-	cb := circuitbreaker.NewCircuitBreaker(name+"-cb", cbSettings)
+	circuitBreaker := circuitbreaker.NewCircuitBreaker(name+"-cb", cbSettings)
 
 	// 5. Create custom transport with circuit breaker
-	transport := circuitbreaker.NewCircuitBreakerTransport(cb, http.DefaultTransport)
+	circuitBreakerTransport := circuitbreaker.NewCircuitBreakerTransport(circuitBreaker, http.DefaultTransport)
 
-	// 6. Create single reverse proxy with dynamic director
+	// 6. Wrap with validating transport to catch Director errors
+	transport := &ValidatingTransport{underlying: circuitBreakerTransport}
+
+	// 7. Create single reverse proxy with dynamic director
 	proxy := &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 			// Load balancer selects target for THIS request
 			targetURL := lb.Next()
 			if targetURL == "" {
 				log.Printf("ERROR: No target available for service %s", name)
+				// Leave request unconfigured - ValidatingTransport will catch this
 				return
 			}
 
 			target, err := url.Parse(targetURL)
 			if err != nil {
 				log.Printf("ERROR: Failed to parse target URL %s: %v", targetURL, err)
+				// Leave request unconfigured - ValidatingTransport will catch this
 				return
 			}
 
@@ -108,6 +127,14 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 				return
 			}
 
+			// Handle Director configuration errors
+			if err != nil && err.Error() == "request not properly configured by director" {
+				log.Printf("Director failed to configure request for service %s: %s", name, req.URL.String())
+				rw.WriteHeader(http.StatusInternalServerError)
+				rw.Write([]byte("Internal server error: failed to configure request"))
+				return
+			}
+
 			// Handle other errors
 			log.Printf("Reverse proxy error for service %s: %s: %v", name, req.URL.String(), err)
 			rw.WriteHeader(http.StatusBadGateway)
@@ -120,7 +147,7 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 		Config:         cfg,
 		Instances:      instances,
 		loadBalancer:   lb,
-		circuitBreaker: cb,
+		circuitBreaker: circuitBreaker,
 		reverseProxy:   proxy,
 		transport:      transport,
 	}, nil
