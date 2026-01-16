@@ -2,8 +2,10 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/pietroagazzi/gater/internal/config"
@@ -175,23 +177,39 @@ func RunWithContext(ctx context.Context, cfg *config.Config) (*gateway.Gateway, 
 	gw := initializeGateway(services, routes)
 	router := gw.SetupRouter()
 
-	// Start server
 	serverAddr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("Starting gateway server on %s", serverAddr)
 	log.Printf("Gateway initialized with %d services and %d routes", len(services), len(routes))
 
-	// Start server in goroutine and wait for context cancellation
+	srv := &http.Server{
+		Addr:    serverAddr,
+		Handler: router,
+	}
+
+	errCh := make(chan error, 1)
 	go func() {
-		if err := router.Run(serverAddr); err != nil {
-			log.Printf("Server stopped: %v", err)
-		}
+		errCh <- srv.ListenAndServe()
 	}()
 
-	// Wait for context cancellation
-	<-ctx.Done()
-	log.Println("Context cancelled, shutting down...")
+	select {
+	case <-ctx.Done():
+		log.Println("Context cancelled, shutting down...")
 
-	return gw, nil
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			return nil, fmt.Errorf("server shutdown failed: %w", err)
+		}
+
+		return gw, nil
+
+	case err := <-errCh:
+		if errors.Is(err, http.ErrServerClosed) {
+			return gw, nil
+		}
+		return nil, fmt.Errorf("server failed: %w", err)
+	}
 }
 
 // Run initializes and starts the Gater application.
