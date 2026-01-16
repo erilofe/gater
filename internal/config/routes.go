@@ -26,6 +26,10 @@ type routeConfigYAML struct {
 
 // validateRoutePath enforces safe route prefix rules
 func validateRoutePath(path string) error {
+	if path == "" {
+		return fmt.Errorf("route path cannot be empty")
+	}
+
 	// Path must start with '/'
 	if path[0] != '/' {
 		return fmt.Errorf("route %s: path must start with '/'", path)
