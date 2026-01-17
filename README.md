@@ -13,6 +13,21 @@ An API Gateway written in Go.
 - Go 1.25.1 or higher.
 - Docker & Docker Compose (for containerized development)
 
+## Development Setup (Git Hooks)
+
+This project uses [pre-commit](https://pre-commit.com/) to manage git hooks for code quality (linting, formatting, tests).
+
+1. Install `pre-commit`:
+   ```bash
+   pip install pre-commit
+   ```
+2. Install the hooks:
+   ```bash
+   pre-commit install
+   ```
+
+Now, `golangci-lint`, `go fmt`, and tests will run automatically on every commit.
+
 ## How to Run
 
 ### Local
