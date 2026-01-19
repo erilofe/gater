@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/pietroagazzi/gater/internal/config"
 	"github.com/pietroagazzi/gater/internal/service"
 )

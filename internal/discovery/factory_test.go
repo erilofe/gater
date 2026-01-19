@@ -3,8 +3,9 @@ package discovery
 import (
 	"testing"
 
-	"github.com/pietroagazzi/gater/internal/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/pietroagazzi/gater/internal/config"
 )
 
 func TestDetermineProviderType(t *testing.T) {

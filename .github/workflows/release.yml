@@ -1,0 +1,122 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - "v*"
+    workflow_dispatch:
+        inputs:
+            version:
+                description: "Version to release (e.g., v1.2.3)"
+                required: true
+                type: string
+
+permissions:
+    contents: write
+    packages: write
+
+jobs:
+    create-release:
+        name: Create Release
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.version.outputs.version }}
+            upload_url: ${{ steps.create_release.outputs.upload_url }}
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0 # Full history for changelog
+
+            - name: Determine version
+              id: version
+              run: |
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+                    VERSION="${{ github.event.inputs.version }}"
+                  else
+                    VERSION="${GITHUB_REF#refs/tags/}"
+                  fi
+                  echo "version=${VERSION}" >> $GITHUB_OUTPUT
+                  echo "Version: ${VERSION}"
+
+            - name: Generate changelog
+              id: changelog
+              uses: orhun/git-cliff-action@v4
+              with:
+                  config: cliff.toml
+                  args: --latest --strip header
+              env:
+                  OUTPUT: CHANGELOG.md
+
+            - name: Create Release
+              id: create_release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.version.outputs.version }}
+                  name: Release ${{ steps.version.outputs.version }}
+                  body: ${{ steps.changelog.outputs.content }}
+                  draft: false
+                  prerelease: false
+                  generate_release_notes: true
+
+    build-binaries:
+        name: Build Release Binaries
+        needs: create-release
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                include:
+                    - goos: linux
+                      goarch: amd64
+                    - goos: linux
+                      goarch: arm64
+                    - goos: darwin
+                      goarch: amd64
+                    - goos: darwin
+                      goarch: arm64
+                    - goos: windows
+                      goarch: amd64
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v6
+
+            - name: Set up Go
+              uses: actions/setup-go@v6
+              with:
+                  go-version: "1.25.6"
+                  cache: true
+
+            - name: Build binary
+              env:
+                  GOOS: ${{ matrix.goos }}
+                  GOARCH: ${{ matrix.goarch }}
+                  VERSION: ${{ needs.create-release.outputs.version }}
+              run: |
+                  OUTPUT_NAME=gater-${VERSION}-${{ matrix.goos }}-${{ matrix.goarch }}
+                  if [ "${{ matrix.goos }}" = "windows" ]; then
+                    OUTPUT_NAME="${OUTPUT_NAME}.exe"
+                  fi
+
+                  # Build with version information
+                  go build \
+                    -v \
+                    -ldflags="-X 'main.Version=${VERSION}' -X 'main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" \
+                    -o "${OUTPUT_NAME}" \
+                    ./cmd/gater/main.go
+
+                  # Create checksum
+                  sha256sum "${OUTPUT_NAME}" > "${OUTPUT_NAME}.sha256"
+
+            - name: Upload Release Asset
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ needs.create-release.outputs.version }}
+                  files: gater-*
+
+    trigger-docker:
+        name: Trigger Docker Build
+        needs: create-release
+        uses: ./.github/workflows/docker-publish.yml
+        with:
+            version: ${{ needs.create-release.outputs.version }}
+        secrets: inherit

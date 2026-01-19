@@ -5,15 +5,15 @@ import (
 	"net/url"
 )
 
-// ServiceInstance represents a single backend instance of a service
-type ServiceInstance struct {
+// Instance represents a single backend instance of a service.
+type Instance struct {
 	URL    string // Full URL (e.g., "http://10.0.1.5:8080")
 	Host   string // Host:Port (e.g., "10.0.1.5:8080")
 	Scheme string // http or https
 }
 
-// NewServiceInstance parses a URL string and creates a ServiceInstance
-func NewServiceInstance(rawURL string) (*ServiceInstance, error) {
+// NewInstance parses a URL string and creates an Instance.
+func NewInstance(rawURL string) (*Instance, error) {
 	if rawURL == "" {
 		return nil, fmt.Errorf("empty URL provided")
 	}
@@ -31,7 +31,7 @@ func NewServiceInstance(rawURL string) (*ServiceInstance, error) {
 		return nil, fmt.Errorf("URL missing host: %s", rawURL)
 	}
 
-	return &ServiceInstance{
+	return &Instance{
 		URL:    rawURL,
 		Host:   parsed.Host,
 		Scheme: parsed.Scheme,

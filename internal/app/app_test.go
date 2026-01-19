@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pietroagazzi/gater/internal/config"
-	"github.com/pietroagazzi/gater/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pietroagazzi/gater/internal/config"
+	"github.com/pietroagazzi/gater/internal/service"
 )
 
 // mockConsulProvider implements a mock discovery provider for testing
@@ -21,7 +22,7 @@ type mockConsulProvider struct {
 	services map[string][]string
 }
 
-func (m *mockConsulProvider) ResolveService(ctx context.Context, serviceName string) ([]string, error) {
+func (m *mockConsulProvider) ResolveService(_ context.Context, serviceName string) ([]string, error) {
 	if urls, exists := m.services[serviceName]; exists {
 		return urls, nil
 	}
@@ -38,6 +39,7 @@ func (m *mockConsulProvider) Close() error {
 
 // createTempConfigFiles creates temporary routes.yml and services.yml files
 func createTempConfigFiles(t *testing.T, routesContent, servicesContent string) (string, string) {
+	t.Helper()
 	// Create temp directory
 	tempDir := t.TempDir()
 
@@ -190,9 +192,9 @@ services:
 
 func TestBuildServices_Success(t *testing.T) {
 	// Create mock backend
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"ok": true}`))
+		_, _ = w.Write([]byte(`{"ok": true}`))
 	}))
 	defer backend.Close()
 
@@ -273,7 +275,7 @@ func TestBuildServices_ServiceNotFoundInDiscovery(t *testing.T) {
 }
 
 func TestValidateRoutes_Success(t *testing.T) {
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer backend.Close()
@@ -318,7 +320,7 @@ func TestValidateRoutes_MissingService(t *testing.T) {
 }
 
 func TestResolveAndCreateService_Success(t *testing.T) {
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer backend.Close()

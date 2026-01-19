@@ -37,24 +37,22 @@ func NewCircuitBreaker(name string, settings Settings) *gobreaker.CircuitBreaker
 	return gobreaker.NewCircuitBreaker(cbSettings)
 }
 
-// CircuitBreakerTransport is an HTTP RoundTripper that wraps another RoundTripper
-// with a circuit breaker.
-type CircuitBreakerTransport struct {
+// Transport is an HTTP RoundTripper that wraps another RoundTripper with a circuit breaker.
+type Transport struct {
 	cb *gobreaker.CircuitBreaker
 	rt http.RoundTripper
 }
 
-// NewCircuitBreakerTransport creates a new CircuitBreakerTransport.
-func NewCircuitBreakerTransport(cb *gobreaker.CircuitBreaker, rt http.RoundTripper) *CircuitBreakerTransport {
-	return &CircuitBreakerTransport{
+// NewTransport creates a new circuit breaker transport.
+func NewTransport(cb *gobreaker.CircuitBreaker, rt http.RoundTripper) *Transport {
+	return &Transport{
 		cb: cb,
 		rt: rt,
 	}
 }
 
-// RoundTrip executes a single HTTP transaction, using the circuit breaker to
-// manage failures.
-func (t *CircuitBreakerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+// RoundTrip executes a single HTTP transaction, using the circuit breaker to manage failures.
+func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := t.cb.Execute(func() (any, error) {
 		resp, err := t.rt.RoundTrip(req) // Perform the actual HTTP request
 

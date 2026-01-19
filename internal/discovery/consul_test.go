@@ -14,12 +14,13 @@ import (
 
 // mockConsulServer creates a mock HTTP server that simulates basic Consul endpoints.
 func mockConsulServer(t *testing.T, services map[string][]api.ServiceEntry) *httptest.Server {
+	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/agent/self":
 			// Health check for NewConsulProvider
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"Config": {"NodeName": "mock-node"}}`))
+			_, _ = w.Write([]byte(`{"Config": {"NodeName": "mock-node"}}`))
 
 		default:
 			// Check if it's a health service query
@@ -32,7 +33,7 @@ func mockConsulServer(t *testing.T, services map[string][]api.ServiceEntry) *htt
 				if !exists {
 					// Return empty list if service not found, similar to Consul
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte("[]"))
+					_, _ = w.Write([]byte("[]"))
 					return
 				}
 

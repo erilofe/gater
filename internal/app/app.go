@@ -193,7 +193,7 @@ func RunWithContext(ctx context.Context, cfg *config.Config) (*gateway.Gateway, 
 
 	select {
 	case <-ctx.Done():
-		log.Println("Context cancelled, shutting down...")
+		log.Println("Context canceled, shutting down...")
 
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()

@@ -16,7 +16,7 @@ type MockRoundTripper struct {
 	Err      error
 }
 
-func (m *MockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (m *MockRoundTripper) RoundTrip(_ *http.Request) (*http.Response, error) {
 	return m.Response, m.Err
 }
 
@@ -32,7 +32,7 @@ func TestNewCircuitBreaker(t *testing.T) {
 	assert.Equal(t, "test-cb", cb.Name())
 }
 
-func TestCircuitBreakerTransport_RoundTrip_Success(t *testing.T) {
+func TestTransport_RoundTrip_Success(t *testing.T) {
 	// Setup
 	cb := NewCircuitBreaker("cb-success", defaultSettings)
 	mockRT := &MockRoundTripper{
@@ -42,10 +42,10 @@ func TestCircuitBreakerTransport_RoundTrip_Success(t *testing.T) {
 		},
 		Err: nil,
 	}
-	transport := NewCircuitBreakerTransport(cb, mockRT)
+	transport := NewTransport(cb, mockRT)
 
 	// Execute
-	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
 	resp, err := transport.RoundTrip(req)
 
 	// Assert
@@ -56,7 +56,7 @@ func TestCircuitBreakerTransport_RoundTrip_Success(t *testing.T) {
 	assert.Equal(t, uint32(0), cb.Counts().TotalFailures)
 }
 
-func TestCircuitBreakerTransport_RoundTrip_5xxError(t *testing.T) {
+func TestTransport_RoundTrip_5xxError(t *testing.T) {
 	// Setup
 	cb := NewCircuitBreaker("cb-500", defaultSettings)
 	mockRT := &MockRoundTripper{
@@ -66,10 +66,10 @@ func TestCircuitBreakerTransport_RoundTrip_5xxError(t *testing.T) {
 		},
 		Err: nil,
 	}
-	transport := NewCircuitBreakerTransport(cb, mockRT)
+	transport := NewTransport(cb, mockRT)
 
 	// Execute
-	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
 	_, err := transport.RoundTrip(req)
 
 	// Assert
@@ -82,7 +82,7 @@ func TestCircuitBreakerTransport_RoundTrip_5xxError(t *testing.T) {
 	assert.Equal(t, gobreaker.StateOpen, cb.State())
 }
 
-func TestCircuitBreakerTransport_RoundTrip_NetworkError(t *testing.T) {
+func TestTransport_RoundTrip_NetworkError(t *testing.T) {
 	// Setup
 	cb := NewCircuitBreaker("cb-net-err", defaultSettings)
 	expectedErr := errors.New("network error")
@@ -90,10 +90,10 @@ func TestCircuitBreakerTransport_RoundTrip_NetworkError(t *testing.T) {
 		Response: nil,
 		Err:      expectedErr,
 	}
-	transport := NewCircuitBreakerTransport(cb, mockRT)
+	transport := NewTransport(cb, mockRT)
 
 	// Execute
-	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
 	_, err := transport.RoundTrip(req)
 
 	// Assert
@@ -114,8 +114,8 @@ func TestCircuitBreaker_TripsOpen(t *testing.T) {
 		},
 		Err: nil,
 	}
-	transport := NewCircuitBreakerTransport(cb, mockRT)
-	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	transport := NewTransport(cb, mockRT)
+	req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
 
 	// Execute: Trip the breaker (need > 3 consecutive failures)
 	for range 4 {

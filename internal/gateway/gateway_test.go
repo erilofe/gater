@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pietroagazzi/gater/internal/config"
-	"github.com/pietroagazzi/gater/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pietroagazzi/gater/internal/config"
+	"github.com/pietroagazzi/gater/internal/service"
 )
 
 func init() {
@@ -39,9 +40,9 @@ func (c *CloseNotifyingRecorder) CloseNotify() <-chan bool {
 
 // createMockBackend creates a test HTTP server that returns a specific response
 func createMockBackend(response string, statusCode int) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(statusCode)
-		w.Write([]byte(response))
+		_, _ = w.Write([]byte(response))
 	}))
 }
 
@@ -133,7 +134,7 @@ func TestGateway_RoutingToCorrectService(t *testing.T) {
 	// Test routing to user service
 	t.Run("Route to user service", func(t *testing.T) {
 		w := NewCloseNotifyingRecorder()
-		req, _ := http.NewRequest("GET", "/users/123", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/users/123", nil)
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -143,7 +144,7 @@ func TestGateway_RoutingToCorrectService(t *testing.T) {
 	// Test routing to post service
 	t.Run("Route to post service", func(t *testing.T) {
 		w := NewCloseNotifyingRecorder()
-		req, _ := http.NewRequest("GET", "/posts/456", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/posts/456", nil)
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -176,7 +177,7 @@ func TestGateway_MethodFiltering(t *testing.T) {
 	// Test GET on readonly endpoint - should succeed
 	t.Run("GET on readonly endpoint", func(t *testing.T) {
 		w := NewCloseNotifyingRecorder()
-		req, _ := http.NewRequest("GET", "/readonly/test", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/readonly/test", nil)
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
@@ -184,7 +185,7 @@ func TestGateway_MethodFiltering(t *testing.T) {
 	// Test POST on readonly endpoint - should fail (404)
 	t.Run("POST on readonly endpoint", func(t *testing.T) {
 		w := NewCloseNotifyingRecorder()
-		req, _ := http.NewRequest("POST", "/readonly/test", nil)
+		req, _ := http.NewRequest(http.MethodPost, "/readonly/test", nil)
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusNotFound, w.Code, "POST should not be allowed on readonly endpoint")
 	})
@@ -192,7 +193,7 @@ func TestGateway_MethodFiltering(t *testing.T) {
 	// Test POST on write endpoint - should succeed
 	t.Run("POST on write endpoint", func(t *testing.T) {
 		w := NewCloseNotifyingRecorder()
-		req, _ := http.NewRequest("POST", "/write/test", nil)
+		req, _ := http.NewRequest(http.MethodPost, "/write/test", nil)
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
@@ -200,7 +201,7 @@ func TestGateway_MethodFiltering(t *testing.T) {
 	// Test DELETE on all endpoint - should succeed
 	t.Run("DELETE on all-methods endpoint", func(t *testing.T) {
 		w := NewCloseNotifyingRecorder()
-		req, _ := http.NewRequest("DELETE", "/all/test", nil)
+		req, _ := http.NewRequest(http.MethodDelete, "/all/test", nil)
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
@@ -228,7 +229,7 @@ func TestGateway_HealthCheck(t *testing.T) {
 
 	// Test health check endpoint
 	w := NewCloseNotifyingRecorder()
-	req, _ := http.NewRequest("GET", "/health", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/health", nil)
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -261,7 +262,7 @@ func TestGateway_UnknownServiceInRoute(t *testing.T) {
 	// Request to existing service should work
 	t.Run("Existing service route works", func(t *testing.T) {
 		w := NewCloseNotifyingRecorder()
-		req, _ := http.NewRequest("GET", "/existing/test", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/existing/test", nil)
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
@@ -269,7 +270,7 @@ func TestGateway_UnknownServiceInRoute(t *testing.T) {
 	// Request to non-existent service should return 404
 	t.Run("Non-existent service route returns 404", func(t *testing.T) {
 		w := NewCloseNotifyingRecorder()
-		req, _ := http.NewRequest("GET", "/missing/test", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/missing/test", nil)
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
@@ -302,7 +303,7 @@ func TestGateway_MultipleInstances(t *testing.T) {
 	responses := make(map[string]int)
 	for i := 0; i < 10; i++ {
 		w := NewCloseNotifyingRecorder()
-		req, _ := http.NewRequest("GET", "/multi/test", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/multi/test", nil)
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -354,7 +355,7 @@ func TestGateway_PrefixMatching(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			w := NewCloseNotifyingRecorder()
-			req, _ := http.NewRequest("GET", tc.path, nil)
+			req, _ := http.NewRequest(http.MethodGet, tc.path, nil)
 			router.ServeHTTP(w, req)
 
 			if tc.shouldWork {

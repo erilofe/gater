@@ -8,10 +8,11 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/sony/gobreaker"
+
 	"github.com/pietroagazzi/gater/internal/circuitbreaker"
 	"github.com/pietroagazzi/gater/internal/config"
 	"github.com/pietroagazzi/gater/internal/loadbalancer"
-	"github.com/sony/gobreaker"
 )
 
 // ValidatingTransport validates that the Director properly configured the request
@@ -32,7 +33,7 @@ func (t *ValidatingTransport) RoundTrip(req *http.Request) (*http.Response, erro
 type Service struct {
 	Name           string
 	Config         *config.ServiceConfig
-	Instances      []*ServiceInstance
+	Instances      []*Instance
 	loadBalancer   *loadbalancer.RoundRobin
 	circuitBreaker *gobreaker.CircuitBreaker
 	reverseProxy   *httputil.ReverseProxy
@@ -54,11 +55,11 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 	}
 
 	// 1. Parse instances
-	instances := make([]*ServiceInstance, 0, len(instanceURLs))
+	instances := make([]*Instance, 0, len(instanceURLs))
 	targetURLs := make([]string, 0, len(instanceURLs))
 
 	for _, rawURL := range instanceURLs {
-		instance, err := NewServiceInstance(rawURL)
+		instance, err := NewInstance(rawURL)
 		if err != nil {
 			log.Printf("WARNING: Failed to parse instance URL %s for service %s: %v", rawURL, name, err)
 			continue
@@ -88,7 +89,7 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 	circuitBreaker := circuitbreaker.NewCircuitBreaker(name+"-cb", cbSettings)
 
 	// 5. Create custom transport with circuit breaker
-	circuitBreakerTransport := circuitbreaker.NewCircuitBreakerTransport(circuitBreaker, http.DefaultTransport)
+	circuitBreakerTransport := circuitbreaker.NewTransport(circuitBreaker, http.DefaultTransport)
 
 	// 6. Wrap with validating transport to catch Director errors
 	transport := &ValidatingTransport{underlying: circuitBreakerTransport}
@@ -123,7 +124,7 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 			if err == gobreaker.ErrOpenState {
 				log.Printf("Circuit breaker open for service %s: %s", name, req.URL.String())
 				rw.WriteHeader(http.StatusServiceUnavailable)
-				rw.Write([]byte("Service unavailable due to high failure rate"))
+				_, _ = rw.Write([]byte("Service unavailable due to high failure rate"))
 				return
 			}
 
@@ -131,14 +132,14 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 			if err != nil && err.Error() == "request not properly configured by director" {
 				log.Printf("Director failed to configure request for service %s: %s", name, req.URL.String())
 				rw.WriteHeader(http.StatusInternalServerError)
-				rw.Write([]byte("Internal server error: failed to configure request"))
+				_, _ = rw.Write([]byte("Internal server error: failed to configure request"))
 				return
 			}
 
 			// Handle other errors
 			log.Printf("Reverse proxy error for service %s: %s: %v", name, req.URL.String(), err)
 			rw.WriteHeader(http.StatusBadGateway)
-			rw.Write([]byte("Bad gateway"))
+			_, _ = rw.Write([]byte("Bad gateway"))
 		},
 	}
 
@@ -159,6 +160,6 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetInstances returns current service instances (for health/monitoring)
-func (s *Service) GetInstances() []*ServiceInstance {
+func (s *Service) GetInstances() []*Instance {
 	return s.Instances
 }

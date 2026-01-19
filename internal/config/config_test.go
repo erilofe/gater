@@ -223,7 +223,7 @@ routes:
 				path = ""
 			} else if tt.createFile {
 				// Create a temporary file for the test
-				tmpFile, err := os.CreateTemp("", "routes_*.yml")
+				tmpFile, err := os.CreateTemp(t.TempDir(), "routes_*.yml")
 				require.NoError(t, err)
 				defer os.Remove(tmpFile.Name()) // Clean up
 
@@ -254,10 +254,8 @@ routes:
 // TestLoadConfig verifies env var loading (basic smoke test)
 func TestLoadConfig(t *testing.T) {
 	// Set some env vars
-	os.Setenv("PORT", "9090")
-	os.Setenv("DISCOVERY_PROVIDER", "consul")
-	defer os.Unsetenv("PORT")
-	defer os.Unsetenv("DISCOVERY_PROVIDER")
+	t.Setenv("PORT", "9090")
+	t.Setenv("DISCOVERY_PROVIDER", "consul")
 
 	cfg := LoadConfig()
 
@@ -390,7 +388,7 @@ services:
 			var path string
 			if tt.createFile {
 				// Create a temporary file for the test
-				tmpFile, err := os.CreateTemp("", "services_*.yml")
+				tmpFile, err := os.CreateTemp(t.TempDir(), "services_*.yml")
 				require.NoError(t, err)
 				defer os.Remove(tmpFile.Name()) // Clean up
 
@@ -445,7 +443,7 @@ services:
         recovery_timeout: 45s
 `
 
-	tmpFile, err := os.CreateTemp("", "services_*.yml")
+	tmpFile, err := os.CreateTemp(t.TempDir(), "services_*.yml")
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
@@ -481,7 +479,7 @@ services:
         recovery_timeout: 30s
 `
 
-	tmpFile, err := os.CreateTemp("", "services_*.yml")
+	tmpFile, err := os.CreateTemp(t.TempDir(), "services_*.yml")
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
