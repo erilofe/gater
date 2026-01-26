@@ -49,7 +49,7 @@ jobs:
           semgrep scan --config=auto --json --output=semgrep-results.json || true
 
       - name: Upload Semgrep results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: semgrep-results
