@@ -24,7 +24,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o gater ./cmd/gater
 
 # Runtime stage
-FROM alpine:3.21
+FROM alpine:3.23
 
 # OCI labels for metadata
 LABEL org.opencontainers.image.title="Gater"
