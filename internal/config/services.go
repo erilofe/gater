@@ -16,6 +16,11 @@ type ServiceConfig struct {
 			RecoveryTimeout time.Duration `yaml:"recovery_timeout"`
 		} `yaml:"circuit_breaker"`
 	} `yaml:"resilience"`
+	Validator *ValidatorConfig `yaml:"validator"`
+}
+
+type ValidatorConfig struct {
+	Websocket *bool `yaml:"websocket"`
 }
 
 // servicesFile represents the structure of services.yml
@@ -52,6 +57,14 @@ func LoadServicesFromFile(filepath string) (map[string]*ServiceConfig, error) {
 		// Set service name from map key if not set in YAML
 		if cfg.ServiceName == "" {
 			cfg.ServiceName = name
+		}
+
+		// If not specified, default value for websocket is false
+		if cfg.Validator == nil || cfg.Validator.Websocket == nil {
+			cfg.Validator = &ValidatorConfig{
+				Websocket: new(bool),
+			}
+			*cfg.Validator.Websocket = false
 		}
 
 		// Validate circuit breaker configuration

@@ -34,6 +34,7 @@ type Service struct {
 	Name           string
 	Config         *config.ServiceConfig
 	Instances      []*Instance
+	Validator      *Validator
 	loadBalancer   *loadbalancer.RoundRobin
 	circuitBreaker *gobreaker.CircuitBreaker
 	reverseProxy   *httputil.ReverseProxy
@@ -117,6 +118,9 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 			req.URL.Host = target.Host
 			req.Host = target.Host
 			req.Header.Add("X-Forwarded-Host", req.Host)
+			req.Header.Add("Forwarded", "for="+req.Host+";proto="+req.URL.Scheme+";by=gater")
+			req.Header.Add("X-Real-Ip", req.RemoteAddr)
+
 		},
 		Transport: transport,
 		ErrorHandler: func(rw http.ResponseWriter, req *http.Request, err error) {
@@ -143,10 +147,14 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 		},
 	}
 
+	// 8. Create Validator
+	validator := NewValidator(cfg.Validator)
+
 	return &Service{
 		Name:           name,
 		Config:         cfg,
 		Instances:      instances,
+		Validator:      validator,
 		loadBalancer:   lb,
 		circuitBreaker: circuitBreaker,
 		reverseProxy:   proxy,
@@ -156,7 +164,9 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 
 // ServeHTTP handles an HTTP request by proxying to the service
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.reverseProxy.ServeHTTP(w, r)
+	if s.Validator.Handle(w, r) {
+		s.reverseProxy.ServeHTTP(w, r)
+	}
 }
 
 // GetInstances returns current service instances (for health/monitoring)
