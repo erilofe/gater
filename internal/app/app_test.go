@@ -217,9 +217,9 @@ func TestBuildServices_Success(t *testing.T) {
 	}
 	servicesConfig["test-service"].Resilience.CircuitBreaker.RecoveryTimeout = 30 * time.Second
 	servicesConfig["test-service"].Validator = &config.ValidatorConfig{
-		Websocket: new(bool),
+		AllowWebsocket: new(bool),
 	}
-	*servicesConfig["test-service"].Validator.Websocket = false
+	*servicesConfig["test-service"].Validator.AllowWebsocket = false
 
 	ctx := context.Background()
 	services, err := buildServices(ctx, routes, servicesConfig, mockProvider, "test.yml")
@@ -301,9 +301,9 @@ func TestValidateRoutes_Success(t *testing.T) {
 	}
 	servicesConfig["test-service"].Resilience.CircuitBreaker.RecoveryTimeout = 30 * time.Second
 	servicesConfig["test-service"].Validator = &config.ValidatorConfig{
-		Websocket: new(bool),
+		AllowWebsocket: new(bool),
 	}
-	*servicesConfig["test-service"].Validator.Websocket = false
+	*servicesConfig["test-service"].Validator.AllowWebsocket = false
 
 	ctx := context.Background()
 	services, err := buildServices(ctx, routes, servicesConfig, mockProvider, "test.yml")
@@ -346,9 +346,9 @@ func TestResolveAndCreateService_Success(t *testing.T) {
 	}
 	servicesConfig["test-service"].Resilience.CircuitBreaker.RecoveryTimeout = 30 * time.Second
 	servicesConfig["test-service"].Validator = &config.ValidatorConfig{
-		Websocket: new(bool),
+		AllowWebsocket: new(bool),
 	}
-	*servicesConfig["test-service"].Validator.Websocket = false
+	*servicesConfig["test-service"].Validator.AllowWebsocket = false
 
 	ctx := context.Background()
 	svc, err := resolveAndCreateService(ctx, "test-service", servicesConfig, mockProvider, "test.yml")

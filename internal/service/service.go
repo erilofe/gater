@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/sony/gobreaker"
@@ -117,9 +118,7 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 			req.URL.Scheme = target.Scheme
 			req.URL.Host = target.Host
 			req.Host = target.Host
-			req.Header.Add("X-Forwarded-Host", req.Host)
-			req.Header.Add("Forwarded", "for="+req.Host+";proto="+req.URL.Scheme+";by=gater")
-			req.Header.Add("X-Real-Ip", req.RemoteAddr)
+			req.Header.Add("Forwarded", "for="+strings.Split(req.RemoteAddr, ":")[0]+";proto="+req.URL.Scheme+";by=gater")
 
 		},
 		Transport: transport,

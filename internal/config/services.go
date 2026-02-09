@@ -20,7 +20,7 @@ type ServiceConfig struct {
 }
 
 type ValidatorConfig struct {
-	Websocket *bool `yaml:"websocket"`
+	AllowWebsocket *bool `yaml:"websocket"`
 }
 
 // servicesFile represents the structure of services.yml
@@ -60,11 +60,11 @@ func LoadServicesFromFile(filepath string) (map[string]*ServiceConfig, error) {
 		}
 
 		// If not specified, default value for websocket is false
-		if cfg.Validator == nil || cfg.Validator.Websocket == nil {
+		if cfg.Validator == nil || cfg.Validator.AllowWebsocket == nil {
 			cfg.Validator = &ValidatorConfig{
-				Websocket: new(bool),
+				AllowWebsocket: new(bool),
 			}
-			*cfg.Validator.Websocket = false
+			*cfg.Validator.AllowWebsocket = false
 		}
 
 		// Validate circuit breaker configuration
