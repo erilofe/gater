@@ -3,10 +3,10 @@ package service
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/sony/gobreaker"
@@ -118,7 +118,14 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 			req.URL.Scheme = target.Scheme
 			req.URL.Host = target.Host
 			req.Host = target.Host
-			req.Header.Add("Forwarded", "for="+strings.Split(req.RemoteAddr, ":")[0]+";proto="+req.URL.Scheme+";by=gater")
+
+			host, _, err := net.SplitHostPort(req.RemoteAddr)
+
+			if err != nil {
+				host = req.RemoteAddr
+			}
+
+			req.Header.Add("Forwarded", "for="+host+";proto="+req.URL.Scheme+";by=gater")
 
 		},
 		Transport: transport,
