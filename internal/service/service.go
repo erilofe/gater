@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/sony/gobreaker"
@@ -118,14 +119,7 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 			req.URL.Scheme = target.Scheme
 			req.URL.Host = target.Host
 			req.Host = target.Host
-
-			host, _, err := net.SplitHostPort(req.RemoteAddr)
-
-			if err != nil {
-				host = req.RemoteAddr
-			}
-
-			req.Header.Add("Forwarded", "for="+host+";proto="+req.URL.Scheme+";by=gater")
+			req.Header.Add("Forwarded", FormatForHeader(req))
 
 		},
 		Transport: transport,
@@ -166,6 +160,21 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 		reverseProxy:   proxy,
 		transport:      transport,
 	}, nil
+}
+
+// Generates a  RFC 7239 compliant Forwarded header from request parameters
+func FormatForHeader(req *http.Request) string {
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+
+	if err != nil {
+		host = req.RemoteAddr
+	}
+
+	if strings.Contains(host, ":") {
+		host = `"[` + host + `]"`
+	}
+
+	return "for=" + host + ";proto=" + req.URL.Scheme + ";by=gater"
 }
 
 // ServeHTTP handles an HTTP request by proxying to the service
