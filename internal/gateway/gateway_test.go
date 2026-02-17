@@ -52,6 +52,10 @@ func createTestService(name string, instanceURLs []string) (*service.Service, er
 		ServiceName: name,
 	}
 	cfg.Resilience.CircuitBreaker.RecoveryTimeout = 30 * time.Second
+	cfg.Validator = &config.ValidatorConfig{
+		AllowWebsocket: new(bool),
+	}
+	*cfg.Validator.AllowWebsocket = false
 
 	return service.NewService(name, instanceURLs, cfg)
 }

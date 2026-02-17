@@ -3,9 +3,11 @@ package service
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/sony/gobreaker"
@@ -34,6 +36,7 @@ type Service struct {
 	Name           string
 	Config         *config.ServiceConfig
 	Instances      []*Instance
+	Validator      *Validator
 	loadBalancer   *loadbalancer.RoundRobin
 	circuitBreaker *gobreaker.CircuitBreaker
 	reverseProxy   *httputil.ReverseProxy
@@ -116,7 +119,8 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 			req.URL.Scheme = target.Scheme
 			req.URL.Host = target.Host
 			req.Host = target.Host
-			req.Header.Add("X-Forwarded-Host", req.Host)
+			req.Header.Add("Forwarded", FormatForHeader(req))
+
 		},
 		Transport: transport,
 		ErrorHandler: func(rw http.ResponseWriter, req *http.Request, err error) {
@@ -143,10 +147,14 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 		},
 	}
 
+	// 8. Create Validator
+	validator := NewValidator(cfg.Validator)
+
 	return &Service{
 		Name:           name,
 		Config:         cfg,
 		Instances:      instances,
+		Validator:      validator,
 		loadBalancer:   lb,
 		circuitBreaker: circuitBreaker,
 		reverseProxy:   proxy,
@@ -154,9 +162,26 @@ func NewService(name string, instanceURLs []string, cfg *config.ServiceConfig) (
 	}, nil
 }
 
+// Generates a  RFC 7239 compliant Forwarded header from request parameters
+func FormatForHeader(req *http.Request) string {
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+
+	if err != nil {
+		host = req.RemoteAddr
+	}
+
+	if strings.Contains(host, ":") {
+		host = `"[` + host + `]"`
+	}
+
+	return "for=" + host + ";proto=" + req.URL.Scheme + ";by=gater"
+}
+
 // ServeHTTP handles an HTTP request by proxying to the service
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.reverseProxy.ServeHTTP(w, r)
+	if s.Validator.Handle(w, r) {
+		s.reverseProxy.ServeHTTP(w, r)
+	}
 }
 
 // GetInstances returns current service instances (for health/monitoring)
