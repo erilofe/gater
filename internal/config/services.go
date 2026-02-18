@@ -16,11 +16,21 @@ type ServiceConfig struct {
 			RecoveryTimeout time.Duration `yaml:"recovery_timeout"`
 		} `yaml:"circuit_breaker"`
 	} `yaml:"resilience"`
-	Validator *ValidatorConfig `yaml:"validator"`
+	LoadBalancer *LoadBalancerConfig `yaml:"load_balancer"`
+	Validator    *ValidatorConfig    `yaml:"validator"`
 }
 
 type ValidatorConfig struct {
 	AllowWebsocket *bool `yaml:"websocket"`
+}
+
+type LoadBalancerConfig struct {
+	Endpoints []EndpointConfig `yaml:"endpoints"`
+}
+
+type EndpointConfig struct {
+	Address string `yaml:"address"`
+	Port    *int   `yaml:"port"`
 }
 
 // servicesFile represents the structure of services.yml
@@ -65,6 +75,28 @@ func LoadServicesFromFile(filepath string) (map[string]*ServiceConfig, error) {
 				AllowWebsocket: new(bool),
 			}
 			*cfg.Validator.AllowWebsocket = false
+		}
+
+		if cfg.LoadBalancer != nil {
+			if len(cfg.LoadBalancer.Endpoints) == 0 {
+				return nil, fmt.Errorf("service %s: load balancer specified at configuration level, must have at least one endpoint", name)
+			}
+
+			for i := range cfg.LoadBalancer.Endpoints {
+				endpoint := &cfg.LoadBalancer.Endpoints[i]
+				if endpoint.Address == "" {
+					return nil, fmt.Errorf("service %s: load balancer endpoint address cannot be empty", name)
+				}
+
+				// If a default port is not specified we assume the value its 80
+				if endpoint.Port == nil {
+					endpoint.Port = new(int)
+					*endpoint.Port = 80
+				} else if *endpoint.Port < 1 || *endpoint.Port > 65535 {
+					//Sanity check, accept only valid port ranges
+					return nil, fmt.Errorf("service %s: load balancer enpoint should specify valid port ranges (must be positive, must not be superior to 65535)", name)
+				}
+			}
 		}
 
 		// Validate circuit breaker configuration

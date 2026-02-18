@@ -500,3 +500,173 @@ services:
 	assert.Equal(t, "service-2", services["service-2"].ServiceName)
 	assert.Equal(t, "service-3", services["service-3"].ServiceName)
 }
+
+func TestLoadServicesFromFile_LoadBalancer(t *testing.T) {
+	tests := []struct {
+		name          string
+		yamlContent   string
+		expectedError bool
+		errorContains string
+		check         func(t *testing.T, services map[string]*ServiceConfig)
+	}{
+		{
+			name: "Failure - Load Balancer with no endpoints",
+			yamlContent: `
+services:
+  user-service:
+    resilience:
+      circuit_breaker:
+        recovery_timeout: 10s
+    load_balancer:
+      endpoints: []
+`,
+			expectedError: true,
+			errorContains: "must have at least one endpoint",
+		},
+		{
+			name: "Failure - Load Balancer endpoint with no address",
+			yamlContent: `
+services:
+  user-service:
+    resilience:
+      circuit_breaker:
+        recovery_timeout: 10s
+    load_balancer:
+      endpoints:
+        - address: ""
+          port: 8080
+`,
+			expectedError: true,
+			errorContains: "endpoint address cannot be empty",
+		},
+		{
+			name: "Success - Load Balancer endpoint with no port defaults to 80",
+			yamlContent: `
+services:
+  user-service:
+    resilience:
+      circuit_breaker:
+        recovery_timeout: 10s
+    load_balancer:
+      endpoints:
+        - address: "localhost"
+`,
+			expectedError: false,
+			check: func(t *testing.T, services map[string]*ServiceConfig) {
+				t.Helper()
+				require.Contains(t, services, "user-service")
+				svc := services["user-service"]
+				require.NotNil(t, svc.LoadBalancer)
+				require.Len(t, svc.LoadBalancer.Endpoints, 1)
+				assert.Equal(t, "localhost", svc.LoadBalancer.Endpoints[0].Address)
+				require.NotNil(t, svc.LoadBalancer.Endpoints[0].Port)
+				assert.Equal(t, 80, *svc.LoadBalancer.Endpoints[0].Port)
+			},
+		},
+		{
+			name: "Failure - Load Balancer endpoint with invalid port (zero)",
+			yamlContent: `
+services:
+  user-service:
+    resilience:
+      circuit_breaker:
+        recovery_timeout: 10s
+    load_balancer:
+      endpoints:
+        - address: "localhost"
+          port: 0
+`,
+			expectedError: true,
+			errorContains: "should specify valid port ranges",
+		},
+		{
+			name: "Failure - Load Balancer endpoint with invalid port (negative)",
+			yamlContent: `
+services:
+  user-service:
+    resilience:
+      circuit_breaker:
+        recovery_timeout: 10s
+    load_balancer:
+      endpoints:
+        - address: "localhost"
+          port: -1
+`,
+			expectedError: true,
+			errorContains: "should specify valid port ranges",
+		},
+		{
+			name: "Failure - Load Balancer endpoint with invalid port (too high)",
+			yamlContent: `
+services:
+  user-service:
+    resilience:
+      circuit_breaker:
+        recovery_timeout: 10s
+    load_balancer:
+      endpoints:
+        - address: "localhost"
+          port: 65536
+`,
+			expectedError: true,
+			errorContains: "should specify valid port ranges",
+		},
+		{
+			name: "Success - Valid Load Balancer configuration",
+			yamlContent: `
+services:
+  user-service:
+    resilience:
+      circuit_breaker:
+        recovery_timeout: 10s
+    load_balancer:
+      endpoints:
+        - address: "user-service-1"
+          port: 8080
+        - address: "user-service-2"
+          port: 8081
+`,
+			expectedError: false,
+			check: func(t *testing.T, services map[string]*ServiceConfig) {
+				t.Helper()
+				require.Contains(t, services, "user-service")
+				svc := services["user-service"]
+				require.NotNil(t, svc.LoadBalancer)
+				require.Len(t, svc.LoadBalancer.Endpoints, 2)
+				assert.Equal(t, "user-service-1", svc.LoadBalancer.Endpoints[0].Address)
+				require.NotNil(t, svc.LoadBalancer.Endpoints[0].Port)
+				assert.Equal(t, 8080, *svc.LoadBalancer.Endpoints[0].Port)
+				assert.Equal(t, "user-service-2", svc.LoadBalancer.Endpoints[1].Address)
+				require.NotNil(t, svc.LoadBalancer.Endpoints[1].Port)
+				assert.Equal(t, 8081, *svc.LoadBalancer.Endpoints[1].Port)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpFile, err := os.CreateTemp(t.TempDir(), "services_*.yml")
+			require.NoError(t, err)
+			defer os.Remove(tmpFile.Name())
+
+			_, err = tmpFile.WriteString(tt.yamlContent)
+			require.NoError(t, err)
+			tmpFile.Close()
+
+			services, err := LoadServicesFromFile(tmpFile.Name())
+
+			if tt.expectedError {
+				assert.Error(t, err)
+				if tt.errorContains != "" {
+					assert.Contains(t, err.Error(), tt.errorContains)
+				}
+			} else {
+				assert.NoError(t, err)
+				require.NotNil(t, services)
+				if tt.check != nil {
+					tt.check(t, services)
+				}
+			}
+		})
+	}
+}

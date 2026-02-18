@@ -12,11 +12,12 @@ type ProviderType string
 
 const (
 	ProviderTypeConsul ProviderType = "consul"
-	// Future: ProviderTypeStatic, ProviderTypeKubernetes, ProviderTypeEtcd
+	ProviderTypeStatic ProviderType = "static"
+	// Future: ProviderTypeKubernetes, ProviderTypeEtcd
 )
 
 // NewProvider creates the appropriate service discovery provider based on configuration.
-func NewProvider(cfg *config.Config) (Provider, error) {
+func NewProvider(cfg *config.Config, servicesConfig map[string]*config.ServiceConfig) (Provider, error) {
 	providerType, err := determineProviderType(cfg)
 	if err != nil {
 		return nil, err
@@ -28,7 +29,8 @@ func NewProvider(cfg *config.Config) (Provider, error) {
 			return nil, fmt.Errorf("CONSUL_ADDRESS is required for consul provider")
 		}
 		return NewConsulProvider(cfg.ConsulAddress)
-
+	case ProviderTypeStatic:
+		return NewStaticProvider(servicesConfig)
 	default:
 		return nil, fmt.Errorf("unknown provider type: %s", providerType)
 	}

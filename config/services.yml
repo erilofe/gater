@@ -4,9 +4,17 @@ services:
         resilience:
             circuit_breaker:
                 recovery_timeout: 30s
+        load_balancer: # when the discovery provider is any other than static these routes are ignored
+            endpoints:
+                - address: user # optional default to 80
+                  port: 8081
 
     post-service:
         service_name: post-service
         resilience:
             circuit_breaker:
                 recovery_timeout: 20s
+        load_balancer:
+            endpoints:
+                - address: post
+                  port: 8082

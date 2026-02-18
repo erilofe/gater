@@ -24,6 +24,14 @@ func TestDetermineProviderType(t *testing.T) {
 			expectedError: false,
 		},
 		{
+			name: "Static Provider",
+			cfg: &config.Config{
+				DiscoveryProvider: "static",
+			},
+			expectedType:  ProviderTypeStatic,
+			expectedError: false,
+		},
+		{
 			name: "No Configuration (even if ConsulAddress is set)",
 			cfg: &config.Config{
 				DiscoveryProvider: "",
@@ -67,10 +75,47 @@ func TestNewProvider(t *testing.T) {
 			ConsulAddress:     server.URL,
 		}
 
-		p, err := NewProvider(cfg)
+		p, err := NewProvider(cfg, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, p)
 		assert.Equal(t, "consul", p.Name())
+	})
+
+	t.Run("Create Static Provider", func(t *testing.T) {
+		cfg := &config.Config{
+			DiscoveryProvider: "static",
+		}
+		services := map[string]*config.ServiceConfig{
+			"service1": {
+				ServiceName: "service1",
+				LoadBalancer: &config.LoadBalancerConfig{
+					Endpoints: []config.EndpointConfig{
+						{Address: "localhost"},
+					},
+				},
+			},
+		}
+
+		p, err := NewProvider(cfg, services)
+		assert.NoError(t, err)
+		assert.NotNil(t, p)
+		assert.Equal(t, "static", p.Name())
+	})
+
+	t.Run("Create Static Provider - Missing LoadBalancer", func(t *testing.T) {
+		cfg := &config.Config{
+			DiscoveryProvider: "static",
+		}
+		services := map[string]*config.ServiceConfig{
+			"service1": {
+				ServiceName: "service1",
+			},
+		}
+
+		p, err := NewProvider(cfg, services)
+		assert.Error(t, err)
+		assert.Nil(t, p)
+		assert.Contains(t, err.Error(), "all services must specify a load balancer configuration")
 	})
 
 	t.Run("Unknown Provider", func(t *testing.T) {
@@ -78,7 +123,7 @@ func TestNewProvider(t *testing.T) {
 			DiscoveryProvider: "alien_tech",
 		}
 
-		p, err := NewProvider(cfg)
+		p, err := NewProvider(cfg, nil)
 		assert.Error(t, err)
 		assert.Nil(t, p)
 		assert.Contains(t, err.Error(), "unknown provider type")
@@ -89,7 +134,7 @@ func TestNewProvider(t *testing.T) {
 			DiscoveryProvider: "",
 		}
 
-		p, err := NewProvider(cfg)
+		p, err := NewProvider(cfg, nil)
 		assert.Error(t, err)
 		assert.Nil(t, p)
 	})

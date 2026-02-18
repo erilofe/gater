@@ -145,19 +145,19 @@ func RunWithContext(ctx context.Context, cfg *config.Config) (*gateway.Gateway, 
 	}
 	log.Printf("Configuration loaded: Port=%s, Consul=%s", cfg.Port, cfg.ConsulAddress)
 
-	// Initialize Service Discovery Provider
-	provider, err := discovery.NewProvider(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize discovery provider: %w", err)
-	}
-	defer provider.Close()
-	log.Printf("Using service discovery provider: %s", provider.Name())
-
 	// Load all configuration files
 	routes, servicesConfig, err := loadConfiguration(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("configuration loading failed: %w", err)
 	}
+
+	// Initialize Service Discovery Provider
+	provider, err := discovery.NewProvider(cfg, servicesConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize discovery provider: %w", err)
+	}
+	defer provider.Close()
+	log.Printf("Using service discovery provider: %s", provider.Name())
 
 	// Resolve and create service entities
 	resolveCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
