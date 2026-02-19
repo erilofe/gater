@@ -88,10 +88,8 @@ func LoadServicesFromFile(filepath string) (map[string]*ServiceConfig, error) {
 					return nil, fmt.Errorf("service %s: load balancer endpoint address cannot be empty", name)
 				}
 
-				// If a default port is not specified we assume the value its 80
 				if endpoint.Port == nil {
-					endpoint.Port = new(int)
-					*endpoint.Port = 80
+					return nil, fmt.Errorf("service %s: load balancer endpoint port must be specified", name)
 				} else if *endpoint.Port < 1 || *endpoint.Port > 65535 {
 					//Sanity check, accept only valid port ranges
 					return nil, fmt.Errorf("service %s: load balancer endpoint should specify valid port ranges (must be positive, must not be superior to 65535)", name)

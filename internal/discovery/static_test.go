@@ -32,7 +32,7 @@ func TestNewStaticProvider(t *testing.T) {
 		provider, err := NewStaticProvider(services)
 		assert.NoError(t, err)
 		assert.NotNil(t, provider)
-		assert.Len(t, provider.Services["service1"].Urls, 2)
+		assert.Len(t, provider.Services["service1"], 2)
 	})
 
 	t.Run("Missing LoadBalancer", func(t *testing.T) {
@@ -47,12 +47,14 @@ func TestNewStaticProvider(t *testing.T) {
 	})
 
 	t.Run("Invalid Address - With Protocol", func(t *testing.T) {
+		defaultPort := 8080
+
 		services := map[string]*config.ServiceConfig{
 			"service1": {
 				ServiceName: "service1",
 				LoadBalancer: &config.LoadBalancerConfig{
 					Endpoints: []config.EndpointConfig{
-						{Address: "http://localhost"},
+						{Address: "http://localhost", Port: &defaultPort},
 					},
 				},
 			},
@@ -78,7 +80,7 @@ func TestNewStaticProvider(t *testing.T) {
 		}
 		_, err := NewStaticProvider(services)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "must not specify a port, use the property `Port` if you need to do so")
+		assert.Contains(t, err.Error(), `failed to parse endpoint URL http://[localhost:8080]:8080: parse "http://[localhost:8080]:8080": invalid host: ParseAddr("localhost:8080"): each colon-separated field must have at least one digit (at "localhost:8080")`)
 	})
 }
 
@@ -88,24 +90,13 @@ func TestStaticProvider_Name(t *testing.T) {
 }
 
 func TestStaticProvider_ResolveService(t *testing.T) {
-
-	localhostEndpoint := config.EndpointConfig{Address: "localhost", Port: new(int)}
-	*localhostEndpoint.Port = 8080
-
-	ipv6Endpoint := config.EndpointConfig{Address: "[::1]", Port: new(int)}
-	*ipv6Endpoint.Port = 8081
-
 	provider := &StaticProvider{
-		Services: map[string]*ServiceUrls{
+		Services: map[string][]string{
 			"service1": {
-				Urls: []config.EndpointConfig{
-					localhostEndpoint,
-					ipv6Endpoint,
-				},
+				"http://localhost:8080",
+				"http://[::1]:8081",
 			},
-			"service2": {
-				Urls: []config.EndpointConfig{},
-			},
+			"service2": {},
 		},
 	}
 
@@ -134,22 +125,22 @@ func TestValidateAddress(t *testing.T) {
 	tests := []struct {
 		name        string
 		addr        string
+		port        int
 		wantErr     bool
 		errContains string
 	}{
-		{"Valid IPv4", "192.168.1.1", false, ""},
-		{"Valid IPv6", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", false, ""},
-		{"Valid Domain", "example.com", false, ""},
-		{"Valid Localhost", "localhost", false, ""},
-		{"Invalid - With Protocol", "https://example.com", true, "address should not include a protocol"},
-		{"Invalid - With Port", "example.com:8080", true, "must not specify a port, use the property `Port` if you need to do so"},
-		{"Invalid - Gibberish", "not-a-valid..address", true, "invalid address"},
-		{"Invalid - Path", "example.com/path", true, "invalid address"},
+		{"Valid IPv4", "192.168.1.1", 8080, false, ""},
+		{"Valid IPv6", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", 8080, false, ""},
+		{"Valid Domain", "example.com", 80, false, ""},
+		{"Valid Localhost", "localhost", 80, false, ""},
+		{"Invalid - With Protocol", "https://example.com", 8, true, "address should not include a protocol"},
+		{"Invalid - With Port", "example.com:8080", 80, true, `failed to parse endpoint URL http://[example.com:8080]:80: parse "http://[example.com:8080]:80": invalid host: ParseAddr("example.com:8080"): unexpected character (at "example.com:8080")`},
+		{"Invalid - Path", "example.com/path", 8080, true, "address should not contain any path components"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateAddress(tt.addr)
+			_, err := buildEndpointURL(tt.addr, tt.port)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)

@@ -6,7 +6,7 @@ services:
                 recovery_timeout: 30s
         load_balancer: # when the discovery provider is any other than static these routes are ignored
             endpoints:
-                - address: user # optional default to 80
+                - address: user
                   port: 8081
 
     post-service:

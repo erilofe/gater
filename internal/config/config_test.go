@@ -540,7 +540,7 @@ services:
 			errorContains: "endpoint address cannot be empty",
 		},
 		{
-			name: "Success - Load Balancer endpoint with no port defaults to 80",
+			name: "Failure - Load Balancer endpoint with no port",
 			yamlContent: `
 services:
   user-service:
@@ -551,17 +551,8 @@ services:
       endpoints:
         - address: "localhost"
 `,
-			expectedError: false,
-			check: func(t *testing.T, services map[string]*ServiceConfig) {
-				t.Helper()
-				require.Contains(t, services, "user-service")
-				svc := services["user-service"]
-				require.NotNil(t, svc.LoadBalancer)
-				require.Len(t, svc.LoadBalancer.Endpoints, 1)
-				assert.Equal(t, "localhost", svc.LoadBalancer.Endpoints[0].Address)
-				require.NotNil(t, svc.LoadBalancer.Endpoints[0].Port)
-				assert.Equal(t, 80, *svc.LoadBalancer.Endpoints[0].Port)
-			},
+			expectedError: true,
+			errorContains: "load balancer endpoint port must be specified",
 		},
 		{
 			name: "Failure - Load Balancer endpoint with invalid port (zero)",

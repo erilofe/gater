@@ -82,6 +82,8 @@ func TestNewProvider(t *testing.T) {
 	})
 
 	t.Run("Create Static Provider", func(t *testing.T) {
+		defaultPort := 8080
+
 		cfg := &config.Config{
 			DiscoveryProvider: "static",
 		}
@@ -90,7 +92,7 @@ func TestNewProvider(t *testing.T) {
 				ServiceName: "service1",
 				LoadBalancer: &config.LoadBalancerConfig{
 					Endpoints: []config.EndpointConfig{
-						{Address: "localhost"},
+						{Address: "localhost", Port: &defaultPort},
 					},
 				},
 			},
