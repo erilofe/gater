@@ -94,7 +94,7 @@ func LoadServicesFromFile(filepath string) (map[string]*ServiceConfig, error) {
 					*endpoint.Port = 80
 				} else if *endpoint.Port < 1 || *endpoint.Port > 65535 {
 					//Sanity check, accept only valid port ranges
-					return nil, fmt.Errorf("service %s: load balancer enpoint should specify valid port ranges (must be positive, must not be superior to 65535)", name)
+					return nil, fmt.Errorf("service %s: load balancer endpoint should specify valid port ranges (must be positive, must not be superior to 65535)", name)
 				}
 			}
 		}

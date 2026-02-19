@@ -22,7 +22,7 @@ type ServiceUrls struct {
 func NewStaticProvider(serviceConfigs map[string]*config.ServiceConfig) (*StaticProvider, error) {
 	services := make(map[string]*ServiceUrls)
 
-	log.Print("[WARNING] Static provider is enabled, this configuration is not recommended for productive environments ")
+	log.Print("[WARNING] Static provider is enabled, this configuration is not recommended for productive environments")
 
 	for _, service := range serviceConfigs {
 
@@ -70,12 +70,11 @@ func validateAddress(addr string) error {
 		return nil
 	}
 
-	// 4. Check if it's a valid Domain
 	if domainRegex.MatchString(addr) {
 		return nil
 	}
 
-	return fmt.Errorf("invalid address %s ", addr)
+	return fmt.Errorf("invalid address %s", addr)
 }
 
 func (p *StaticProvider) Name() string {
@@ -89,7 +88,7 @@ func (p *StaticProvider) Close() error {
 
 func (p *StaticProvider) ResolveService(_ context.Context, serviceName string) ([]string, error) {
 	if p.Services[serviceName] == nil || len(p.Services[serviceName].Urls) == 0 {
-		return nil, fmt.Errorf("no urls found for service %s and provider static ", serviceName)
+		return nil, fmt.Errorf("no urls found for service %s", serviceName)
 	}
 
 	urls := make([]string, 0, len(p.Services[serviceName].Urls))
